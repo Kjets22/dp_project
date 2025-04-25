@@ -1,1 +1,10 @@
+<<<<<<< HEAD
 *.pyc
+=======
+venv/
+__pycache__/
+*.pyc
+instance/
+.env
+.vscode/
+>>>>>>> f867efc (Initial commit: Flask auction system with MySQL)

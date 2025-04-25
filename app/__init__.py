@@ -1,6 +1,6 @@
 # app/__init__.py
 
-from flask import Flask, jsonify, redirect, request
+from flask import Flask, jsonify, redirect, request, render_template, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -226,12 +226,31 @@ def create_app():
         db.session.add(i); db.session.commit()
         return jsonify(id=i.id,title=i.title,category_id=i.category_id), 201
 
-    @app.route("/ping")
-    def ping():
-        return "pong", 200
+    # @app.route("/ping")
+    # def ping():
+    #     return "pong", 200
 
     @app.route("/")
     def home():
-        return redirect("/ping")
+        return render_template("index.html")
 
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if request.method == "POST":
+            user_id = request.form["id"]
+            password = request.form["password"]
+
+            user = db.session.query(User).filter_by(user_id=user_id).first()
+
+            if user and user.password == password:
+                print("Is this working?")
+                print(app.secret_key)
+                # session["user_uid"] = user.uid
+                # #TODO: Refresh after done
+                # flash("Login successful!", "success")
+                return redirect(url_for("user_detail", uid=user.id))
+            # else:
+            #     flash("Invalid username or password", "danger")
+
+        return render_template("login.html")
     return app

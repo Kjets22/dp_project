@@ -84,13 +84,50 @@ def create_app():
         }), 200
 
     # -------------- (keep your existing routes) ----------------
-    from app.models import User, Category, Item, Auction, Bid
+    from app.models import User, Category, Item, Auction, Bid, Alert
 
     @app.route("/users", methods=["GET"])
     def list_users():
         return jsonify([u.username for u in User.query.all()]), 200
 
     
+    # -----------------------
+    # Alerts Endpoints
+    # -----------------------
+
+    @app.route("/alerts/<string:username>", methods=["GET"])
+    def list_alerts(username):
+        """List all alerts for a given user."""
+        alerts = Alert.query.filter_by(username=username).all()
+        return jsonify([
+            {
+                "id":            a.id,
+                "criteria_json": a.criteria_json,
+                "created_at":    a.created_at.isoformat()
+            }
+            for a in alerts
+        ]), 200
+
+    @app.route("/alerts/<string:username>", methods=["POST"])
+    def create_alert(username):
+        """
+        Create an alert for `username`.
+        JSON body is the criteria, e.g.:
+          { "category_id":1, "min_price":50 }
+        """
+        data = request.get_json(force=True)
+        if not isinstance(data, dict):
+            return jsonify(error="JSON object required"), 400
+
+        a = Alert(username=username, criteria_json=data)
+        db.session.add(a)
+        db.session.commit()
+        return jsonify(
+            id=a.id,
+            criteria_json=a.criteria_json,
+            created_at=a.created_at.isoformat()
+        ), 201
+
     # -----------------------
     # Bidding Endpoints
     # -----------------------
@@ -191,6 +228,16 @@ def create_app():
         # Neither amount nor max_bid supplied
         return jsonify(error="Either 'amount' or 'max_bid' is required"), 400
    
+    # Manual trigger for testing alerts
+    @app.route("/run_alerts", methods=["POST"])
+    def run_alerts():
+        """
+        Manually invoke process_alerts() so you can see its log output immediately.
+        """
+        from app.tasks import process_alerts
+        process_alerts()
+        return "Alerts processed", 200
+
     @app.route("/users/<string:username>", methods=["POST"])
     def create_user(username):
         if User.query.filter_by(username=username).first():

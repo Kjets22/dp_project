@@ -55,3 +55,12 @@ class Bid(db.Model):
 
     def __repr__(self):
         return f"<Bid {self.amount} by {self.bidder} on auction {self.auction_id}>"
+
+class Alert(db.Model):
+    id            = db.Column(db.Integer, primary_key=True)
+    username      = db.Column(db.String(64), nullable=False)  # who set the alert
+    criteria_json = db.Column(db.JSON,   nullable=False)      # e.g. {"category_id":1,"min_price":50}
+    created_at    = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<Alert {self.id} for {self.username}: {self.criteria_json}>"

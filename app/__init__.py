@@ -321,20 +321,21 @@ def create_app():
     
     @app.route("/login", methods=["GET","POST"])
     def login():
-        if request.method == "POST":
-            data = request.form  # for form POST; use request.get_json() for JSON
-            username = data.get("username") or data.get("id")
-            password = data.get("password")
-
-            # find by username
+        if request.method=="POST":
+            data     = request.form
+            username = data.get("username","").strip()
+            password = data.get("password","")
             user = User.query.filter_by(username=username).first()
-            if user and check_password_hash(user.password_hash, password):
-                # login success
+            if user and check_password_hash(user.password_hash,password):
                 session["user_id"] = user.id
-                flash("Login successful!", "success")
-                return redirect(url_for("user_detail", uid=user.id))
-
-            flash("Invalid username or password", "danger")
-
+                flash("Login successful!","success")
+                return redirect(url_for("user_detail", id=user.id))
+            flash("Invalid credentials","danger")
         return render_template("login.html")
+    
+    @app.route("/users/<int:id>", methods=["GET"])
+    def user_detail(id):
+        user = User.query.get_or_404(id)
+        return render_template("user/detail.html", user=user)
+    
     return app

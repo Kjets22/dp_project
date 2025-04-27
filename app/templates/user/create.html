@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}Create User{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-title">
+        <h4>Create User</h4>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('create_user') }}">
+          <!-- Username (login name) -->
+          <div class="form-group">
+            <label>Username</label>
+            <input
+              name="username"
+              type="text"
+              class="form-control"
+              required
+            >
+            <small class="form-text text-muted">
+              This will be your login username.
+            </small>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary mt-2"
+              onclick="checkUsername()"
+            >
+              Check Availability
+            </button>
+            <div id="username-check-result" class="mt-2"></div>
+          </div>
+
+          <!-- Password -->
+          <div class="form-group">
+            <label>Password</label>
+            <input
+              name="password"
+              type="password"
+              class="form-control"
+              required
+            >
+          </div>
+
+          <!-- Full Name -->
+          <div class="form-group">
+            <label>Full Name</label>
+            <input
+              name="full_name"
+              type="text"
+              class="form-control"
+              required
+            >
+          </div>
+
+          <!-- Date of Birth -->
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input
+              name="date_of_birth"
+              type="date"
+              class="form-control"
+              required
+            >
+          </div>
+          <button type="submit" class="btn btn-primary mt-3">Create Account</button>
+          <!-- <button
+            type="submit"
+            class="btn btn-primary mt-3"
+          >
+            Create Account
+          </button> -->
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function checkUsername() {
+  const input       = document.querySelector('input[name="username"]');
+  const resultDiv   = document.getElementById('username-check-result');
+  const uname       = input.value.trim();
+
+  // clear old
+  resultDiv.textContent = "";
+  resultDiv.classList.remove("text-success", "text-danger");
+
+  if (!uname) {
+    resultDiv.textContent = "⚠️ Enter a username first.";
+    resultDiv.classList.add("text-danger");
+    return;
+  }
+
+  try {
+    const res = await fetch(`/check_username?username=${encodeURIComponent(uname)}`);
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Server error");
+    }
+    const { available } = await res.json();
+
+    if (available) {
+      resultDiv.textContent = "✅ Username is available!";
+      resultDiv.classList.add("text-success");
+    } else {
+      resultDiv.textContent = "❌ Username is already taken.";
+      resultDiv.classList.add("text-danger");
+    }
+
+  } catch (e) {
+    resultDiv.textContent = `Error: ${e.message}`;
+    resultDiv.classList.add("text-danger");
+  }
+}
+</script>
+{% endblock %}

@@ -1,6 +1,6 @@
 # app/__init__.py
-
-from flask import Flask, jsonify, redirect, request, render_template, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, jsonify, redirect, request, render_template, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
@@ -190,14 +190,79 @@ def create_app():
 
         # Neither amount nor max_bid supplied
         return jsonify(error="Either 'amount' or 'max_bid' is required"), 400
-   
-    @app.route("/users/<string:username>", methods=["POST"])
-    def create_user(username):
-        if User.query.filter_by(username=username).first():
-            return jsonify(error="User already exists"), 400
-        u = User(username=username)
-        db.session.add(u); db.session.commit()
-        return jsonify(username=u.username), 201
+    
+    @app.route("/check_username")
+    def check_username():
+        uname = request.args.get("username", "").strip()
+        if not uname:
+            return jsonify(error="No username supplied"), 400
+        taken = User.query.filter_by(username=uname).first() is not None
+        return jsonify(available=not taken), 200
+    
+    # @app.route("/users/<string:username>", methods=["POST"])
+    # def create_user(username):
+    #     if User.query.filter_by(username=username).first():
+    #         return jsonify(error="User already exists"), 400
+    #     u = User(username=username)
+    #     db.session.add(u); db.session.commit()
+    #     return jsonify(username=u.username), 201@app.route("/users/create", methods=["GET", "POST"])
+    @app.route("/users/create", methods=["GET","POST"])
+    def create_user():
+        # --- GET: show the registration form ---
+        if request.method == "GET":
+            return render_template("user/create.html")
+
+        # --- POST: process submitted form ---
+        form        = request.form
+        username    = form.get("username", "").strip()
+        password    = form.get("password", "")
+        full_name   = form.get("full_name", "").strip()
+        dob_str     = form.get("date_of_birth", "")
+
+        # Validate inputs
+        errors = []
+        if not username:
+            errors.append("Username is required.")
+        if not password:
+            errors.append("Password is required.")
+        if not full_name:
+            errors.append("Full name is required.")
+        if not dob_str:
+            errors.append("Date of birth is required.")
+
+        # Check for duplicate username
+        if username and User.query.filter_by(username=username).first():
+            errors.append("That username is already taken.")
+
+        if errors:
+            for e in errors:
+                flash(e, "danger")
+            return redirect(url_for("create_user"))
+
+        # Parse the date string into a date object
+        try:
+            date_of_birth = datetime.strptime(dob_str, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Invalid date format; please use YYYY-MM-DD.", "danger")
+            return redirect(url_for("create_user"))
+
+        # All good—hash the password and create the user
+        hashed_pw = generate_password_hash(password)
+        user = User(
+            username       = username,
+            password_hash  = hashed_pw,
+            full_name      = full_name,
+            date_of_birth  = date_of_birth
+        )
+        db.session.add(user)
+        db.session.commit()
+
+        flash("Account created successfully! Please log in.", "success")
+        return redirect(url_for("login"))
+    
+    # @app.route("/users/create", methods=["GET"])
+    # def user_create_form():
+    #     return render_template("user/create.html")
 
     @app.route("/categories", methods=["GET"])
     def list_categories():
@@ -234,23 +299,42 @@ def create_app():
     def home():
         return render_template("index.html")
 
-    @app.route("/login", methods=["GET", "POST"])
+    # @app.route("/login", methods=["GET", "POST"])
+    # def login():
+    #     if request.method == "POST":
+    #         user_id = request.form["id"]
+    #         password = request.form["password"]
+
+    #         user = db.session.query(User).filter_by(user_id=user_id).first()
+
+    #         if user and user.password == password:
+    #             print("Is this working?")
+    #             print(app.secret_key)
+    #             # session["user_uid"] = user.uid
+    #             # #TODO: Refresh after done
+    #             # flash("Login successful!", "success")
+    #             return redirect(url_for("user_detail", uid=user.id))
+    #         # else:
+    #         #     flash("Invalid username or password", "danger")
+
+    #     return render_template("login.html")
+    
+    @app.route("/login", methods=["GET","POST"])
     def login():
         if request.method == "POST":
-            user_id = request.form["id"]
-            password = request.form["password"]
+            data = request.form  # for form POST; use request.get_json() for JSON
+            username = data.get("username") or data.get("id")
+            password = data.get("password")
 
-            user = db.session.query(User).filter_by(user_id=user_id).first()
-
-            if user and user.password == password:
-                print("Is this working?")
-                print(app.secret_key)
-                # session["user_uid"] = user.uid
-                # #TODO: Refresh after done
-                # flash("Login successful!", "success")
+            # find by username
+            user = User.query.filter_by(username=username).first()
+            if user and check_password_hash(user.password_hash, password):
+                # login success
+                session["user_id"] = user.id
+                flash("Login successful!", "success")
                 return redirect(url_for("user_detail", uid=user.id))
-            # else:
-            #     flash("Invalid username or password", "danger")
+
+            flash("Invalid username or password", "danger")
 
         return render_template("login.html")
     return app

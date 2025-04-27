@@ -3,8 +3,11 @@
 from flask import Flask, jsonify, redirect, request
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from flask_login import LoginManager, login_user, logout_user, login_required
 
 db = SQLAlchemy()
+login = LoginManager()
+login.login_view = 'auth_login'
 
 def create_app():
     app = Flask(__name__)
@@ -16,6 +19,13 @@ def create_app():
         # import all models
         from app.models import User, Category, Item, Auction
         db.create_all()
+    
+    login.init_app(app)
+
+    @login.user_loader
+    def load_user(user_id):
+        from app.models import User
+        return User.query.get(int(user_id))   
 
     # --------------- Auction Endpoints ----------------
 
@@ -163,6 +173,42 @@ def create_app():
             criteria_json=a.criteria_json,
             created_at=a.created_at.isoformat()
         ), 201
+    
+    login.init_app(app)
+
+    # -----------------
+    # AUTH (API-only)
+    # -----------------
+
+    @app.route('/auth/register', methods=['POST'])
+    def auth_register():
+        data = request.get_json(force=True)
+        u = data.get('username'); p = data.get('password')
+        if not u or not p:
+            return jsonify(error="username and password required"), 400
+        if User.query.filter_by(username=u).first():
+            return jsonify(error="User already exists"), 400
+        user = User(username=u)
+        user.set_password(p)
+        db.session.add(user)
+        db.session.commit()
+        return jsonify(username=user.username), 201
+
+    @app.route('/auth/login', methods=['POST'])
+    def auth_login():
+        data = request.get_json(force=True)
+        u = data.get('username'); p = data.get('password')
+        user = User.query.filter_by(username=u).first()
+        if user is None or not user.check_password(p):
+            return jsonify(error="Invalid credentials"), 400
+        login_user(user)
+        return jsonify(message="Logged in"), 200
+
+    @app.route('/auth/logout', methods=['POST'])
+    @login_required
+    def auth_logout():
+        logout_user()
+        return jsonify(message="Logged out"), 200
 
     # -----------------------
     # Bidding Endpoints

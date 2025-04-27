@@ -28,85 +28,115 @@ def create_app():
         return User.query.get(int(user_id))   
 
     # --------------- Auction Endpoints ----------------
-
-    @app.route("/auctions", methods=["GET"])
-    def list_auctions():
-        """Return all auctions with basic info."""
-        auctions = Auction.query.all()
-        return jsonify([
-            {
-                "id":         a.id,
-                "item_id":    a.item_id,
-                "start_time": a.start_time.isoformat(),
-                "end_time":   a.end_time.isoformat(),
-                "init_price": a.init_price,
-                "increment":  a.increment,
-                "reserve_price": a.reserve_price,
-                "status":     a.status
-            }
-            for a in auctions
-        ]), 200
-
-
-    @app.route("/auctions/<int:item_id>", methods=["POST"])
+ 
+    @app.route('/auctions/<int:item_id>', methods=['POST'])
     def create_auction(item_id):
-        """
-        JSON body must include:
-          { "username": "<seller_username>",
-            "end_time": "...",
-            "init_price": float,
-            "increment": float,
-            "reserve_price": float }
-        """
         data = request.get_json(force=True)
-        seller = User.query.filter_by(username=data.get("username")).first()
-        if not seller:
-            return jsonify(error="Seller not found"), 404
-
-        # verify item exists
-        if not Item.query.get(item_id):
+        # must pass: username, end_time (ISO8601), init_price, increment, reserve_price
+        username = data.get('username')
+        end_str  = data.get('end_time')
+        if not username or not end_str:
+            return jsonify(error="username and end_time required"), 400
+    
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            return jsonify(error="User not found"), 404
+    
+        item = Item.query.get(item_id)
+        if not item:
             return jsonify(error="Item not found"), 404
-
+    
         try:
-            end = datetime.fromisoformat(data["end_time"])
-        except:
+            end_dt = datetime.fromisoformat(end_str)
+        except ValueError:
             return jsonify(error="Invalid end_time format"), 400
-
+    
         a = Auction(
-            item_id      = item_id,
-            seller_id    = seller.id,
-            end_time     = end,
-            init_price   = data["init_price"],
-            increment    = data["increment"],
-            reserve_price= data["reserve_price"],
+            item_id       = item_id,
+            seller_id     = user.id,
+            end_time      = end_dt,
+            init_price    = data.get('init_price', 0),
+            increment     = data.get('increment', 1),
+            reserve_price = data.get('reserve_price', 0),
         )
         db.session.add(a)
         db.session.commit()
         return jsonify(id=a.id), 201
-
-    @app.route("/auctions/<int:auction_id>", methods=["GET"])
-    def get_auction(auction_id):
-        """Return full details of one auction."""
-        a = Auction.query.get_or_404(auction_id)
+    
+    
+    @app.route('/auctions', methods=['GET'])
+    def list_auctions():
+        all_aucs = Auction.query.all()
+        return jsonify([{
+            'id':            a.id,
+            'item_id':       a.item_id,
+            'seller_id':     a.seller_id,
+            'start_time':    a.start_time.isoformat(),
+            'end_time':      a.end_time.isoformat(),
+            'init_price':    a.init_price,
+            'increment':     a.increment,
+            'reserve_price': a.reserve_price,
+            'status':        a.status,
+        } for a in all_aucs])
+    
+    
+    @app.route('/auctions/<int:auc_id>', methods=['GET'])
+    def get_auction(auc_id):
+        a = Auction.query.get(auc_id)
+        if not a:
+            return jsonify(error="Auction not found"), 404
         return jsonify({
-            "id":         a.id,
-            "item_id":    a.item_id,
-            "start_time": a.start_time.isoformat(),
-            "end_time":   a.end_time.isoformat(),
-            "init_price": a.init_price,
-            "increment":  a.increment,
-            "reserve_price": a.reserve_price,
-            "status":     a.status
-        }), 200
-
+            'id':            a.id,
+            'item_id':       a.item_id,
+            'seller_id':     a.seller_id,
+            'start_time':    a.start_time.isoformat(),
+            'end_time':      a.end_time.isoformat(),
+            'init_price':    a.init_price,
+            'increment':     a.increment,
+            'reserve_price': a.reserve_price,
+            'status':        a.status,
+        }) 
     # -------------- (keep your existing routes) ----------------
     from app.models import User, Category, Item, Auction, Bid, Alert
 
     @app.route("/users", methods=["GET"])
     def list_users():
         return jsonify([u.username for u in User.query.all()]), 200
-
-        
+    
+    # Create a new category (optionally as a subcategory)
+    @app.route('/categories', methods=['POST'])
+    def create_category():
+        data = request.get_json(force=True)
+        name = data.get('name')
+        parent_id = data.get('parent_id')  # optional
+        if not name:
+            return jsonify(error="name is required"), 400
+        # verify parent exists if given
+        if parent_id is not None and not Category.query.get(parent_id):
+            return jsonify(error="parent_id not found"), 404
+    
+        cat = Category(name=name, parent_id=parent_id)
+        db.session.add(cat)
+        db.session.commit()
+        return jsonify(cat.to_dict()), 201
+    
+    # List all categories
+    @app.route('/categories', methods=['GET'])
+    def list_categories():
+        cats = Category.query.all()
+        return jsonify([c.to_dict() for c in cats]), 200
+    
+    # Get a single category (with its children)
+    @app.route('/categories/<int:cat_id>', methods=['GET'])
+    def get_category(cat_id):
+        cat = Category.query.get(cat_id)
+        if not cat:
+            return jsonify(error="Category not found"), 404
+        d = cat.to_dict()
+        d['children'] = [child.to_dict() for child in cat.children]
+        return jsonify(d), 200
+    
+            
     # ------------------------------
     # Participation & Bidder History
     # ------------------------------
@@ -328,33 +358,43 @@ def create_app():
         db.session.add(u); db.session.commit()
         return jsonify(username=u.username), 201
 
-    @app.route("/categories", methods=["GET"])
-    def list_categories():
-        cats = Category.query.all()
-        return jsonify([{"id":c.id,"name":c.name,"parent_id":c.parent_id} for c in cats]), 200
-
-    @app.route("/categories/<string:name>", methods=["POST"])
-    def create_category(name):
-        parent = request.args.get("parent_id", type=int)
-        if Category.query.filter_by(name=name, parent_id=parent).first():
-            return jsonify(error="Category already exists"), 400
-        c = Category(name=name, parent_id=parent)
-        db.session.add(c); db.session.commit()
-        return jsonify(id=c.id,name=c.name,parent_id=c.parent_id), 201
-
-    @app.route("/items", methods=["GET"])
-    def list_items():
-        items = Item.query.all()
-        return jsonify([{"id":i.id,"title":i.title,"category_id":i.category_id} for i in items]), 200
-
-    @app.route("/items/<string:title>/<int:category_id>", methods=["POST"])
-    def create_item(title, category_id):
+    
+    # Create a new item
+    @app.route('/items', methods=['POST'])
+    def create_item():
+        data = request.get_json(force=True)
+        title       = data.get('title')
+        description = data.get('description')
+        category_id = data.get('category_id')
+        if not title or category_id is None:
+            return jsonify(error="title and category_id are required"), 400
+        # verify category exists
         if not Category.query.get(category_id):
-            return jsonify(error="Category not found"), 404
-        i = Item(title=title, category_id=category_id)
-        db.session.add(i); db.session.commit()
-        return jsonify(id=i.id,title=i.title,category_id=i.category_id), 201
-
+            return jsonify(error="category_id not found"), 404
+    
+        item = Item(title=title, description=description, category_id=category_id)
+        db.session.add(item)
+        db.session.commit()
+        return jsonify(item.to_dict()), 201
+    
+    # List all items (with optional ?category_id= filter)
+    @app.route('/items', methods=['GET'])
+    def list_items():
+        cid = request.args.get('category_id', type=int)
+        query = Item.query
+        if cid is not None:
+            query = query.filter_by(category_id=cid)
+        items = query.all()
+        return jsonify([i.to_dict() for i in items]), 200
+    
+    # Get a single item
+    @app.route('/items/<int:item_id>', methods=['GET'])
+    def get_item(item_id):
+        item = Item.query.get(item_id)
+        if not item:
+            return jsonify(error="Item not found"), 404
+        return jsonify(item.to_dict()), 200
+        
     @app.route("/ping")
     def ping():
         return "pong", 200

@@ -37,32 +37,38 @@ def create_app():
             for a in auctions
         ]), 200
 
+
     @app.route("/auctions/<int:item_id>", methods=["POST"])
     def create_auction(item_id):
         """
-        Create an auction for an existing item.
-        Expects JSON body:
-          { "end_time":"YYYY-MM-DDThh:mm:ss",
+        JSON body must include:
+          { "username": "<seller_username>",
+            "end_time": "...",
             "init_price": float,
             "increment": float,
             "reserve_price": float }
         """
         data = request.get_json(force=True)
-        # validate item exists
+        seller = User.query.filter_by(username=data.get("username")).first()
+        if not seller:
+            return jsonify(error="Seller not found"), 404
+
+        # verify item exists
         if not Item.query.get(item_id):
             return jsonify(error="Item not found"), 404
 
         try:
             end = datetime.fromisoformat(data["end_time"])
-        except Exception:
+        except:
             return jsonify(error="Invalid end_time format"), 400
 
         a = Auction(
-            item_id       = item_id,
-            end_time      = end,
-            init_price    = data["init_price"],
-            increment     = data["increment"],
-            reserve_price = data["reserve_price"]
+            item_id      = item_id,
+            seller_id    = seller.id,
+            end_time     = end,
+            init_price   = data["init_price"],
+            increment    = data["increment"],
+            reserve_price= data["reserve_price"],
         )
         db.session.add(a)
         db.session.commit()
@@ -90,7 +96,37 @@ def create_app():
     def list_users():
         return jsonify([u.username for u in User.query.all()]), 200
 
-    
+        
+    # ------------------------------
+    # Participation & Bidder History
+    # ------------------------------
+
+    @app.route("/users/<string:username>/auctions", methods=["GET"])
+    def user_auctions(username):
+        u = User.query.filter_by(username=username).first_or_404()
+        auctions = Auction.query.filter_by(seller_id=u.id).all()
+        return jsonify([{
+            "auction_id": a.id,
+            "item_id":    a.item_id,
+            "start_time": a.start_time.isoformat(),
+            "end_time":   a.end_time.isoformat(),
+            "status":     a.status
+        } for a in auctions]), 200
+ 
+    @app.route("/users/<string:username>/bids", methods=["GET"])
+    def user_bids(username):
+        """
+        List all bids placed by this user across all auctions.
+        """
+        bids = Bid.query.filter_by(bidder=username)\
+                        .order_by(Bid.timestamp.desc()).all()
+        return jsonify([{
+            "bid_id":      b.id,
+            "auction_id":  b.auction_id,
+            "amount":      b.amount,
+            "timestamp":   b.timestamp.isoformat()
+        } for b in bids]), 200
+
     # -----------------------
     # Alerts Endpoints
     # -----------------------

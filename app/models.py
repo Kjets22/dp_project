@@ -24,24 +24,28 @@ class Item(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     def __repr__(self):
         return f"<Item {self.title!r}>"
-
+    
 class Auction(db.Model):
     id             = db.Column(db.Integer, primary_key=True)
     item_id        = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    seller_id      = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)   # ← new!
     start_time     = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     end_time       = db.Column(db.DateTime, nullable=False)
-    init_price     = db.Column(db.Float, nullable=False)
-    increment      = db.Column(db.Float, nullable=False)
-    reserve_price  = db.Column(db.Float, nullable=False)
+    init_price     = db.Column(db.Float,    nullable=False)
+    increment      = db.Column(db.Float,    nullable=False)
+    reserve_price  = db.Column(db.Float,    nullable=False)
     status         = db.Column(db.String(10), nullable=False, default='open')
 
+    # relationships
     item           = db.relationship('Item', backref='auctions')
+    seller         = db.relationship('User', backref='auctions')  # ← and this
 
     def __repr__(self):
         return (
-            f"<Auction item={self.item_id} init={self.init_price} "
-            f"end={self.end_time.isoformat()}>"
+            f"<Auction id={self.id} item={self.item_id} seller={self.seller_id} "
+            f"start={self.start_time.isoformat()} end={self.end_time.isoformat()}>"
         )
+    
 class Bid(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     auction_id  = db.Column(db.Integer, db.ForeignKey('auction.id'), nullable=False)

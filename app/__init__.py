@@ -4,6 +4,7 @@ from flask import Flask, jsonify, redirect, request
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask_login import LoginManager, login_user, logout_user, login_required
+from flask_apscheduler import APScheduler
 
 db = SQLAlchemy()
 login = LoginManager()
@@ -136,7 +137,41 @@ def create_app():
         d['children'] = [child.to_dict() for child in cat.children]
         return jsonify(d), 200
     
-            
+    class SchedulerConfig:
+        SCHEDULER_API_ENABLED = True
+        # add any other APScheduler settings here
+    
+    def create_app():
+        app = Flask(__name__)
+        app.config.from_object("config.Config")
+        app.config.from_object(SchedulerConfig)
+    
+        # … your existing init_app, db.create_all(), login, routes, etc.
+    
+        # ↓↓↓ add this block at the bottom of create_app() before `return app` ↓↓↓
+        scheduler = APScheduler()
+        scheduler.init_app(app)
+        scheduler.start()
+    
+        # Close auctions every minute
+        scheduler.add_job(
+            id='close_auctions',
+            func=close_auctions,
+            trigger='interval',
+            minutes=1
+        )
+    
+        # Process alerts every 5 minutes
+        scheduler.add_job(
+            id='process_alerts',
+            func=process_alerts,
+            trigger='interval',
+            minutes=5
+        )
+        # ↑↑↑ end scheduler block ↑↑↑
+    
+        return app
+    
     # ------------------------------
     # Participation & Bidder History
     # ------------------------------

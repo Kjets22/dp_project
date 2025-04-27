@@ -13,7 +13,7 @@
     {% endif %}
   {% endwith %}
 
-  <form method="post" action="{{ url_for('login') }}">
+  <form method="post" action="{{ url_for('auth_login') }}">
     <div class="form-group">
       <label for="username">Username</label>
       <input type="text" class="form-control" id="username" name="username" required>
@@ -26,7 +26,7 @@
   </form>
 
   <div class="mt-3 text-center">
-    <a href="{{ url_for('create_user') }}" class="btn btn-link">
+    <a href="{{ url_for('auth_register') }}" class="btn btn-link">
       Don’t have an account? Create one
     </a>
   </div>

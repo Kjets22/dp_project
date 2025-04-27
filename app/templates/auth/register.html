@@ -10,7 +10,7 @@
         <h4>Create User</h4>
       </div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('create_user') }}">
+        <form method="post" action="{{ url_for('auth_register') }}">
           <!-- Username (login name) -->
           <div class="form-group">
             <label>Username</label>
@@ -66,12 +66,6 @@
             >
           </div>
           <button type="submit" class="btn btn-primary mt-3">Create Account</button>
-          <!-- <button
-            type="submit"
-            class="btn btn-primary mt-3"
-          >
-            Create Account
-          </button> -->
         </form>
       </div>
     </div>

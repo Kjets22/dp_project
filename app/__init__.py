@@ -209,30 +209,89 @@ def create_app():
     # -----------------
     # AUTH (API-only)
     # -----------------
+    
+    @app.route('/auth/register', methods=['GET'])
+    def auth_register_form():
+        return render_template('/auth/register.html')
 
     @app.route('/auth/register', methods=['POST'])
     def auth_register():
-        data = request.get_json(force=True)
-        u = data.get('username'); p = data.get('password')
-        if not u or not p:
-            return jsonify(error="username and password required"), 400
-        if User.query.filter_by(username=u).first():
-            return jsonify(error="User already exists"), 400
-        user = User(username=u)
-        user.set_password(p)
+        form      = request.form
+        username  = form.get('username', '').strip()
+        password  = form.get('password', '')
+        full_name = form.get('full_name', '').strip()
+        dob_str   = form.get('date_of_birth', '').strip()
+
+        errors = []
+        if not username:
+            errors.append("Username is required.")
+        if not password:
+            errors.append("Password is required.")
+        if not full_name:
+            errors.append("Full name is required.")
+        if not dob_str:
+            errors.append("Date of birth is required.")
+
+        # duplicate‐username check
+        if username and User.query.filter_by(username=username).first():
+            errors.append("That username is already taken.")
+
+        if errors:
+            for e in errors:
+                flash(e, "danger")
+            return redirect(url_for('auth_register'))
+
+        # parse date_of_birth
+        try:
+            date_of_birth = datetime.strptime(dob_str, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Invalid date format, use YYYY-MM-DD.", "danger")
+            return redirect(url_for('auth_register'))
+
+        # create & save the user
+        user = User(
+            username=username,
+            full_name=full_name,
+            date_of_birth=date_of_birth
+        )
+        user.set_password(password)     # your model’s hashing method
         db.session.add(user)
         db.session.commit()
-        return jsonify(username=user.username), 201
 
-    @app.route('/auth/login', methods=['POST'])
+        flash("Account created successfully! Please log in.", "success")
+        return redirect(url_for('auth_login'))
+    
+    # @app.route('/auth/login', methods=['GET'])
+    # def auth_login_form():
+    #     return render_template('/auth/login.html')
+    
+    @app.route('/auth/login', methods=['GET','POST'])
     def auth_login():
-        data = request.get_json(force=True)
-        u = data.get('username'); p = data.get('password')
-        user = User.query.filter_by(username=u).first()
-        if user is None or not user.check_password(p):
-            return jsonify(error="Invalid credentials"), 400
+        if request.method == 'GET':
+            # Show the HTML login page
+            return render_template('auth/login.html')
+
+        # POST: process form fields
+        form     = request.form
+        username = form.get('username', '').strip()
+        password = form.get('password', '')
+
+        user = User.query.filter_by(username=username).first()
+        if user is None or not user.check_password(password):
+            flash("Invalid username or password", "danger")
+            # re-render the form with a flash message
+            return render_template('auth/login.html'), 400
+
+        # login_user will set up the session
         login_user(user)
-        return jsonify(message="Logged in"), 200
+        flash("Login successful!", "success")
+        # redirect to your user_detail view, which is /users/<id>
+        return redirect(url_for('user_detail', id=user.id))
+    
+    @app.route("/auth/<int:id>", methods=["GET"])
+    def user_detail(id):
+        user = User.query.get_or_404(id)
+        return render_template("/auth/detail.html", user=user)
 
     @app.route('/auth/logout', methods=['POST'])
     @login_required
@@ -423,23 +482,19 @@ def create_app():
 
     #     return render_template("login.html")
     
-    @app.route("/login", methods=["GET","POST"])
-    def login():
-        if request.method=="POST":
-            data     = request.form
-            username = data.get("username","").strip()
-            password = data.get("password","")
-            user = User.query.filter_by(username=username).first()
-            if user and check_password_hash(user.password_hash,password):
-                session["user_id"] = user.id
-                flash("Login successful!","success")
-                return redirect(url_for("user_detail", id=user.id))
-            flash("Invalid credentials","danger")
-        return render_template("login.html")
-    
-    @app.route("/users/<int:id>", methods=["GET"])
-    def user_detail(id):
-        user = User.query.get_or_404(id)
-        return render_template("user/detail.html", user=user)
+    # @app.route("/login", methods=["GET","POST"])
+    # def login():
+    #     if request.method=="POST":
+    #         data     = request.form
+    #         username = data.get("username","").strip()
+    #         password = data.get("password","")
+    #         user = User.query.filter_by(username=username).first()
+    #         if user and check_password_hash(user.password_hash,password):
+    #             session["user_id"] = user.id
+    #             flash("Login successful!","success")
+    #             return redirect(url_for("user_detail", id=user.id))
+    #         flash("Invalid credentials","danger")
+    #     return render_template("login.html")
+
     
     return app

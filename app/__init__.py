@@ -782,7 +782,10 @@ def create_app():
 
     @app.route("/")
     def home():
-        return render_template("index.html")
+        # fetch all items, newest first
+        from app.models import Item
+        items = Item.query.order_by(Item.id.desc()).all()
+        return render_template("index.html", items=items)
 
     
     return app

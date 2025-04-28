@@ -67,7 +67,11 @@ def create_app():
     
     @app.route('/auctions', methods=['GET'])
     def list_auctions():
-        all_aucs = Auction.query.all()
+        status = request.args.get('status')
+        q = Auction.query
+        if status in ('open', 'closed'):
+            q = q.filter_by(status=status)
+        all_aucs = q.all()
         return jsonify([{
             'id':            a.id,
             'item_id':       a.item_id,
@@ -78,15 +82,30 @@ def create_app():
             'increment':     a.increment,
             'reserve_price': a.reserve_price,
             'status':        a.status,
-        } for a in all_aucs])
+        } for a in all_aucs]), 200
+
     
     
     @app.route('/auctions/<int:auc_id>', methods=['GET'])
     def get_auction(auc_id):
-        a = Auction.query.get(auc_id)
-        if not a:
-            return jsonify(error="Auction not found"), 404
-        return jsonify({
+        a = Auction.query.get_or_404(auc_id)
+    
+        # pull all bids for this auction, highest‐first
+        bids = Bid.query.filter_by(auction_id=auc_id)\
+                        .order_by(Bid.amount.desc()).all()
+        bid_list = [{
+            'id':        b.id,
+            'bidder':    b.bidder,
+            'amount':    b.amount,
+            'max_bid':   b.max_bid,
+            'timestamp': b.timestamp.isoformat()
+        } for b in bids]
+    
+        # compute current high bid (or init_price if none)
+        current_high = bids[0].amount if bids else a.init_price
+    
+        # build response
+        resp = {
             'id':            a.id,
             'item_id':       a.item_id,
             'seller_id':     a.seller_id,
@@ -96,8 +115,22 @@ def create_app():
             'increment':     a.increment,
             'reserve_price': a.reserve_price,
             'status':        a.status,
-        }) 
-    # -------------- (keep your existing routes) ----------------
+            'current_high':  current_high,
+            'bids':          bid_list
+        }
+    
+        # if auction closed, also include winner & winning_bid
+        if a.status == 'closed':
+            if bids:
+                resp['winner']      = bids[0].bidder
+                resp['winning_bid'] = bids[0].amount
+            else:
+                resp['winner']      = None
+                resp['winning_bid'] = None
+    
+        return jsonify(resp), 200
+    
+     # -------------- (keep your existing routes) ----------------
     from app.models import User, Category, Item, Auction, Bid, Alert
 
     @app.route("/users", methods=["GET"])
@@ -427,15 +460,6 @@ def create_app():
         db.session.commit()
         return jsonify(cat.to_dict()), 200
 
-    # Delete a category (only logged-in users)
-    @app.route('/categories/<int:cat_id>', methods=['DELETE'])
-    @login_required
-    def delete_category(cat_id):
-        cat = Category.query.get_or_404(cat_id)
-        db.session.delete(cat)
-        db.session.commit()
-        return '', 204
-    
     # Create a new item
     @app.route('/items', methods=['POST'])
     @login_required

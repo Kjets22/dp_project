@@ -10,13 +10,15 @@
         <h4>Create User</h4>
       </div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('auth_register') }}">
+        <form method="post" action="{{ url_for('auth_register') }}" id="register-form" novalidate>
+          <!-- Username -->
           <div class="form-group">
             <label>Username</label>
             <input
               name="username"
               type="text"
               class="form-control"
+              id="username-input"
               required
             >
             <small class="form-text text-muted">
@@ -25,7 +27,7 @@
             <button
               type="button"
               class="btn btn-sm btn-outline-secondary mt-2"
-              onclick="checkUsername()"
+              id="check-btn"
             >
               Check Availability
             </button>
@@ -64,7 +66,16 @@
               required
             >
           </div>
-          <button type="submit" class="btn btn-primary mt-3">Create Account</button>
+
+          <!-- Submit -->
+          <button
+            type="submit"
+            class="btn btn-primary mt-3"
+            id="submit-btn"
+            disabled
+          >
+            Create Account
+          </button>
         </form>
       </div>
     </div>
@@ -72,41 +83,61 @@
 </div>
 
 <script>
-async function checkUsername() {
-  const input       = document.querySelector('input[name="username"]');
+  let usernameChecked = false;
+  let isAvailable    = false;
+
+  const input       = document.getElementById('username-input');
+  const checkBtn    = document.getElementById('check-btn');
   const resultDiv   = document.getElementById('username-check-result');
-  const uname       = input.value.trim();
+  const submitBtn   = document.getElementById('submit-btn');
+  const form        = document.getElementById('register-form');
 
-  // clear old
-  resultDiv.textContent = "";
-  resultDiv.classList.remove("text-success", "text-danger");
+  checkBtn.addEventListener('click', async () => {
+    const uname = input.value.trim();
+    // reset
+    usernameChecked = false;
+    isAvailable    = false;
+    submitBtn.disabled = true;
+    resultDiv.textContent = '';
+    resultDiv.classList.remove('text-success','text-danger');
 
-  if (!uname) {
-    resultDiv.textContent = "⚠️ Enter a username first.";
-    resultDiv.classList.add("text-danger");
-    return;
-  }
-
-  try {
-    const res = await fetch(`/auth/check_username?username=${encodeURIComponent(uname)}`);
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || "Server error");
+    if (!uname) {
+      resultDiv.textContent = '⚠️ Enter a username first.';
+      resultDiv.classList.add('text-danger');
+      return;
     }
-    const { available } = await res.json();
-
-    if (available) {
-      resultDiv.textContent = "Username is available!";
-      resultDiv.classList.add("text-success");
-    } else {
-      resultDiv.textContent = "Username is already taken.";
-      resultDiv.classList.add("text-danger");
+    try {
+      const res = await fetch(`/auth/check_username?username=${encodeURIComponent(uname)}`);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Server error');
+      }
+      const { available } = await res.json();
+      usernameChecked = true;
+      if (available) {
+        isAvailable = true;
+        resultDiv.textContent = '✅ Username is available!';
+        resultDiv.classList.add('text-success');
+        submitBtn.disabled = false;
+      } else {
+        resultDiv.textContent = '❌ Username is already taken.';
+        resultDiv.classList.add('text-danger');
+      }
+    } catch (err) {
+      resultDiv.textContent = `Error: ${err.message}`;
+      resultDiv.classList.add('text-danger');
     }
+  });
 
-  } catch (e) {
-    resultDiv.textContent = `Error: ${e.message}`;
-    resultDiv.classList.add("text-danger");
-  }
-}
+  form.addEventListener('submit', e => {
+    // Prevent submitting if not checked or not available
+    if (!usernameChecked) {
+      e.preventDefault();
+      alert('Please click “Check Availability” before submitting.');
+    } else if (!isAvailable) {
+      e.preventDefault();
+      alert('That username is unavailable – please choose another and check again.');
+    }
+  });
 </script>
 {% endblock %}

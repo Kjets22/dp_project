@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Item: {{ item.title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>{{ item.title }}</h2>
+  <p><strong>Category:</strong> {{ item.category.name }}</p>
+  <p><strong>Description:</strong> {{ item.description or '—' }}</p>
+  <p><strong>Owner:</strong>
+    <a href="{{ url_for('user_detail', id=item.owner.id) }}">
+      {{ item.owner.username }}
+    </a>
+  </p>
+
+  {% if item.auctions %}
+    <h4 class="mt-4">Auctions</h4>
+    <ul class="list-group">
+      {% for auc in item.auctions %}
+        <li class="list-group-item d-flex justify-content-between">
+          Auction #{{ auc.id }} —
+          ends {{ auc.end_time.strftime('%b %-d, %Y %H:%M') }} —
+          status: {{ auc.status }}
+          <a href="{{ url_for('get_auction', auc_id=auc.id) }}" class="btn btn-sm btn-outline-secondary">
+            View
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted mt-4">No auctions opened for this item yet.</p>
+  {% endif %}
+
+  <a href="{{ url_for('user_detail', id=current_user.id) }}" class="btn btn-link mt-4">
+    ← Back to My Page
+  </a>
+</div>
+{% endblock %}

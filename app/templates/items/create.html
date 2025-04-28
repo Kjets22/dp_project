@@ -30,7 +30,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Title -->
       <div class="form-group">
         <label for="title">Title</label>
@@ -54,32 +54,6 @@
           rows="3"
           required
         ></textarea>
-      </div>
-
-      <!-- Starting Price -->
-      <div class="form-group">
-        <label for="price">Starting Price</label>
-        <input
-          id="price"
-          type="number"
-          step="0.01"
-          name="price"
-          class="form-control"
-          required
-        >
-      </div>
-
-      <!-- Minimum Bidding Increment -->
-      <div class="form-group">
-        <label for="min_bid_inc">Minimum Bidding Increment</label>
-        <input
-          id="min_bid_inc"
-          type="number"
-          step="0.01"
-          name="min_bid_inc"
-          class="form-control"
-          required
-        >
       </div>
 
       <button type="submit" class="btn btn-primary mt-3" href="{{ url_for('create_item_form')}}">

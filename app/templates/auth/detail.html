@@ -14,8 +14,11 @@
     <ul class="list-group mb-4">
       {% for item in created_items %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
-          {{ item.title }}
-          <a href="{{ url_for('create_auction', item_id=item.id) }}" class="btn btn-sm btn-outline-primary">
+          <a href="{{ url_for('item_detail', item_id=item.id) }}">
+            {{ item.title }}
+          </a>
+          <a href="{{ url_for('open_auction', item_id=item.id) }}"
+             class="btn btn-sm btn-outline-primary">
             Create Auction
           </a>
         </li>

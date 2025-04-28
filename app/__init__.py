@@ -29,40 +29,90 @@ def create_app():
         return User.query.get(int(user_id))   
 
     # --------------- Auction Endpoints ----------------
- 
-    @app.route('/auctions/<int:item_id>', methods=['POST'])
-    def create_auction(item_id):
-        data = request.get_json(force=True)
-        # must pass: username, end_time (ISO8601), init_price, increment, reserve_price
-        username = data.get('username')
-        end_str  = data.get('end_time')
-        if not username or not end_str:
-            return jsonify(error="username and end_time required"), 400
+    @app.route("/auctions/open/<int:item_id>", methods=["GET","POST"])
+    @login_required
+    def open_auction(item_id):
+        # 1) Grab the item, ensuring it belongs to current_user
+        item = Item.query.get_or_404(item_id)
+        if item.owner_id != current_user.id:
+            # flash("You can only open auctions for your own items.", "danger")
+            return redirect(url_for("user_detail", id=current_user.id))
+
+        # 2) On POST, read the form and create Auction
+        if request.method == "POST":
+            end_time_str  = request.form.get("end_time","").strip()
+            init_price    = request.form.get("init_price", type=float)
+            increment     = request.form.get("increment", type=float)
+            reserve_price = request.form.get("reserve_price", type=float)
+
+            # basic validation
+            errors = []
+            if not end_time_str:
+                errors.append("End time is required.")
+            if init_price is None:
+                errors.append("Starting price is required.")
+            if increment is None:
+                errors.append("Increment is required.")
+            if reserve_price is None:
+                errors.append("Reserve price is required.")
+            # parse datetime
+            try:
+                end_time = datetime.fromisoformat(end_time_str)
+            except ValueError:
+                errors.append("Invalid end-time format; use YYYY-MM-DDTHH:MM.")
+
+            if errors:
+                for e in errors:
+                    flash(e, "danger")
+            else:
+                a = Auction(
+                    item_id       = item.id,
+                    seller_id     = current_user.id,
+                    end_time      = end_time,
+                    init_price    = init_price,
+                    increment     = increment,
+                    reserve_price = reserve_price
+                )
+                db.session.add(a)
+                db.session.commit()
+                # flash("Auction opened successfully!", "success")
+                return redirect(url_for("user_detail", id=current_user.id))
+
+        # 3) On GET (or if validation failed), render the form
+        return render_template("auctions/open.html", item=item)
+    # @app.route('/auctions/<int:item_id>', methods=['POST'])
+    # def create_auction(item_id):
+    #     data = request.get_json(force=True)
+    #     # must pass: username, end_time (ISO8601), init_price, increment, reserve_price
+    #     username = data.get('username')
+    #     end_str  = data.get('end_time')
+    #     if not username or not end_str:
+    #         return jsonify(error="username and end_time required"), 400
     
-        user = User.query.filter_by(username=username).first()
-        if not user:
-            return jsonify(error="User not found"), 404
+    #     user = User.query.filter_by(username=username).first()
+    #     if not user:
+    #         return jsonify(error="User not found"), 404
     
-        item = Item.query.get(item_id)
-        if not item:
-            return jsonify(error="Item not found"), 404
+    #     item = Item.query.get(item_id)
+    #     if not item:
+    #         return jsonify(error="Item not found"), 404
     
-        try:
-            end_dt = datetime.fromisoformat(end_str)
-        except ValueError:
-            return jsonify(error="Invalid end_time format"), 400
+    #     try:
+    #         end_dt = datetime.fromisoformat(end_str)
+    #     except ValueError:
+    #         return jsonify(error="Invalid end_time format"), 400
     
-        a = Auction(
-            item_id       = item_id,
-            seller_id     = user.id,
-            end_time      = end_dt,
-            init_price    = data.get('init_price', 0),
-            increment     = data.get('increment', 1),
-            reserve_price = data.get('reserve_price', 0),
-        )
-        db.session.add(a)
-        db.session.commit()
-        return jsonify(id=a.id), 201
+    #     a = Auction(
+    #         item_id       = item_id,
+    #         seller_id     = user.id,
+    #         end_time      = end_dt,
+    #         init_price    = data.get('init_price', 0),
+    #         increment     = data.get('increment', 1),
+    #         reserve_price = data.get('reserve_price', 0),
+    #     )
+    #     db.session.add(a)
+    #     db.session.commit()
+    #     return jsonify(id=a.id), 201
     
     
     @app.route('/auctions', methods=['GET'])
@@ -116,7 +166,7 @@ def create_app():
             parent_id = request.form.get("parent_id", type=int) or None
 
             if not name:
-                flash("Category name required.", "danger")
+                # flash("Category name required.", "danger")
                 return redirect(url_for("create_category_form"))
 
             cat = Category(name=name, parent_id=parent_id)
@@ -310,7 +360,7 @@ def create_app():
         try:
             date_of_birth = datetime.strptime(dob_str, "%Y-%m-%d").date()
         except ValueError:
-            flash("Invalid date format, use YYYY-MM-DD.", "danger")
+            # flash("Invalid date format, use YYYY-MM-DD.", "danger")
             return redirect(url_for('auth_register'))
 
         # create & save the user
@@ -323,7 +373,7 @@ def create_app():
         db.session.add(user)
         db.session.commit()
 
-        flash("Account created successfully! Please log in.", "success")
+        # flash("Account created successfully! Please log in.", "success")
         return redirect(url_for('auth_login'))
     
     @app.route("/auth/check_username", methods=["GET"])
@@ -352,13 +402,13 @@ def create_app():
 
         user = User.query.filter_by(username=username).first()
         if user is None or not user.check_password(password):
-            flash("Invalid username or password", "danger")
+            # flash("Invalid username or password", "danger")
             # re-render the form with a flash message
             return render_template('auth/login.html'), 400
 
         # login_user will set up the session
         login_user(user)
-        flash("Login successful!", "success")
+        # flash("Login successful!", "success")
         # redirect to your user_detail view, which is /users/<id>
         return redirect(url_for('user_detail', id=user.id))
     
@@ -564,7 +614,7 @@ def create_app():
             )
             db.session.add(item)
             db.session.commit()
-            flash("Item created! Now you can create an auction for it.", "success")
+            # flash("Item created! Now you can create an auction for it.", "success")
             # return redirect(url_for("list_items"))
             return redirect(url_for("user_detail", id=current_user.id))
 
@@ -573,6 +623,12 @@ def create_app():
             "items/create.html",
             categories=categories
         )
+    @app.route("/items/<int:item_id>", methods=["GET"])
+    @login_required
+    def item_detail(item_id):
+        # fetch or 404
+        item = Item.query.get_or_404(item_id)
+        return render_template("items/detail.html", item=item)
     # @app.route('/items', methods=['GET'])
     # def create_item_form():
     #     return render_template("/items/create.html")

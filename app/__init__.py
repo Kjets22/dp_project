@@ -1,6 +1,6 @@
 # app/__init__.py
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask import Flask, jsonify, redirect, request, render_template, url_for, flash, session
+from sqlalchemy import or_
+from flask import Flask, jsonify, redirect, request, render_template, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
@@ -35,7 +35,6 @@ def create_app():
         # 1) Grab the item, ensuring it belongs to current_user
         item = Item.query.get_or_404(item_id)
         if item.owner_id != current_user.id:
-            # flash("You can only open auctions for your own items.", "danger")
             return redirect(url_for("user_detail", id=current_user.id))
 
         # 2) On POST, read the form and create Auction
@@ -75,7 +74,6 @@ def create_app():
                 )
                 db.session.add(a)
                 db.session.commit()
-                # flash("Auction opened successfully!", "success")
                 return redirect(url_for("user_detail", id=current_user.id))
 
         # 3) On GET (or if validation failed), render the form
@@ -139,24 +137,20 @@ def create_app():
         if request.method == "POST":
             # a) owner can’t bid on own auction
             if current_user.id == auction.seller_id:
-                flash("You cannot bid on your own auction.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
             # b) highest bidder can’t outbid themself
             if highest_bidder == current_user.username:
-                flash("You’re already the highest bidder.", "warning")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
             # c) parse & validate amount
             try:
                 new_amount = float(request.form["bid_amount"])
             except (KeyError, ValueError):
-                flash("Please enter a valid number.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
             required_min = current_price + auction.increment
             if new_amount < required_min:
-                flash(f"Your bid must be at least {required_min:.2f}.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
             # d) record the bid
@@ -167,7 +161,6 @@ def create_app():
             )
             db.session.add(b)
             db.session.commit()
-            flash("Your bid was placed!", "success")
             return redirect(url_for("auction_detail", auc_id=auc_id))
 
         # 3) GET → render
@@ -237,13 +230,11 @@ def create_app():
             parent_id = request.form.get("parent_id", type=int) or None
 
             if not name:
-                # flash("Category name required.", "danger")
                 return redirect(url_for("create_category_form"))
 
             cat = Category(name=name, parent_id=parent_id)
             db.session.add(cat)
             db.session.commit()
-            flash(f"Category “{name}” added!", "success")
             return redirect(url_for("create_item_form"))
 
         return render_template(
@@ -431,7 +422,6 @@ def create_app():
         try:
             date_of_birth = datetime.strptime(dob_str, "%Y-%m-%d").date()
         except ValueError:
-            # flash("Invalid date format, use YYYY-MM-DD.", "danger")
             return redirect(url_for('auth_register'))
 
         # create & save the user
@@ -444,7 +434,6 @@ def create_app():
         db.session.add(user)
         db.session.commit()
 
-        # flash("Account created successfully! Please log in.", "success")
         return redirect(url_for('auth_login'))
     
     @app.route("/auth/check_username", methods=["GET"])
@@ -473,13 +462,11 @@ def create_app():
 
         user = User.query.filter_by(username=username).first()
         if user is None or not user.check_password(password):
-            # flash("Invalid username or password", "danger")
             # re-render the form with a flash message
             return render_template('auth/login.html'), 400
 
         # login_user will set up the session
         login_user(user)
-        # flash("Login successful!", "success")
         # redirect to your user_detail view, which is /users/<id>
         return redirect(url_for('user_detail', id=user.id))
     
@@ -685,8 +672,6 @@ def create_app():
             )
             db.session.add(item)
             db.session.commit()
-            # flash("Item created! Now you can create an auction for it.", "success")
-            # return redirect(url_for("list_items"))
             return redirect(url_for("user_detail", id=current_user.id))
 
         # GET → show the form
@@ -697,7 +682,6 @@ def create_app():
     @app.route("/items/<int:item_id>", methods=["GET"])
     @login_required
     def item_detail(item_id):
-        # fetch or 404
         item = Item.query.get_or_404(item_id)
         return render_template("items/detail.html", item=item)
     # @app.route('/items', methods=['GET'])
@@ -787,5 +771,58 @@ def create_app():
         items = Item.query.order_by(Item.id.desc()).all()
         return render_template("index.html", items=items)
 
-    
+    @app.route('/browse', methods=['GET'])
+    def browse():
+        # pull query params
+        q           = request.args.get('q', '').strip()
+        category_id = request.args.get('category_id', type=int)
+        min_price   = request.args.get('min_price', type=float)
+        max_price   = request.args.get('max_price', type=float)
+
+        # show nothing until the user actually searches or picks a filter
+        if not (q or category_id or min_price is not None or max_price is not None):
+            return render_template(
+                'browse.html',
+                items=[],
+                q=q,
+                categories=Category.query.order_by(Category.name).all(),
+                selected_category=category_id,
+                min_price=min_price,
+                max_price=max_price
+            )
+
+        # build the query
+        query = Item.query
+
+        # text search on title or description
+        if q:
+            query = query.filter(or_(
+                Item.title.ilike(f'%{q}%'),
+                Item.description.ilike(f'%{q}%')
+            ))
+
+        # filter by category if given
+        if category_id:
+            query = query.filter_by(category_id=category_id)
+
+        # only show items with an open auction
+        query = query.join(Auction, (Auction.item_id == Item.id) & (Auction.status == 'open'))
+
+        # filter by auction’s starting price as an approximation for “price range”
+        if min_price is not None:
+            query = query.filter(Auction.init_price >= min_price)
+        if max_price is not None:
+            query = query.filter(Auction.init_price <= max_price)
+
+        items = query.order_by(Item.id.desc()).all()
+
+        return render_template(
+            'browse.html',
+            items=items,
+            q=q,
+            categories=Category.query.order_by(Category.name).all(),
+            selected_category=category_id,
+            min_price=min_price,
+            max_price=max_price
+        )
     return app

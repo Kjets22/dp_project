@@ -17,14 +17,12 @@
           <a href="{{ url_for('item_detail', item_id=item.id) }}">
             {{ item.title }}
           </a>
-  
-          {# only show “Create Auction” if no auction exists yet #}
-          {% if not item.auctions %}
+          {% if current_user.is_authenticated and current_user.id == user.id and not item.auctions %}
             <a href="{{ url_for('open_auction', item_id=item.id) }}"
-               class="btn btn-sm btn-outline-primary">
+              class="btn btn-sm btn-outline-primary">
               Create Auction
             </a>
-          {% else %}
+          {% elif current_user.id == user.id %}
             <span class="badge badge-secondary">Already Auctioned</span>
           {% endif %}
         </li>

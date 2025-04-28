@@ -409,6 +409,33 @@ def create_app():
         return jsonify(username=u.username), 201
 
     
+    # Update a category (only logged-in users)
+    @app.route('/categories/<int:cat_id>', methods=['PUT'])
+    @login_required
+    def update_category(cat_id):
+        cat = Category.query.get_or_404(cat_id)
+        data = request.get_json(force=True)
+        # allow changing name
+        if 'name' in data:
+            cat.name = data['name']
+        # allow reparenting (or removing parent)
+        if 'parent_id' in data:
+            parent_id = data['parent_id']
+            if parent_id is not None and not Category.query.get(parent_id):
+                return jsonify(error="parent_id not found"), 404
+            cat.parent_id = parent_id
+        db.session.commit()
+        return jsonify(cat.to_dict()), 200
+
+    # Delete a category (only logged-in users)
+    @app.route('/categories/<int:cat_id>', methods=['DELETE'])
+    @login_required
+    def delete_category(cat_id):
+        cat = Category.query.get_or_404(cat_id)
+        db.session.delete(cat)
+        db.session.commit()
+        return '', 204
+    
     # Create a new item
     @app.route('/items', methods=['POST'])
     @login_required
@@ -417,22 +444,24 @@ def create_app():
         title       = data.get('title')
         description = data.get('description')
         category_id = data.get('category_id')
+    
         if not title or category_id is None:
             return jsonify(error="title and category_id are required"), 400
         if not Category.query.get(category_id):
             return jsonify(error="category_id not found"), 404
     
-       # link to the current user
+        # link to the currently-logged in user
         item = Item(
-            title=title,
-            description=description,
-            category_id=category_id,
-            owner_id=current_user.id
+            title       = title,
+            description = description,
+            category_id = category_id,
+            owner_id    = current_user.id
         )
         db.session.add(item)
         db.session.commit()
-        return jsonify(item.to_dict()), 201
+        return jsonify(item.to_dict()), 201   
     
+    # Update an item (only its owner can)
     
     # Update an item (only its owner can)
     @app.route('/items/<int:item_id>', methods=['PUT'])
@@ -441,6 +470,7 @@ def create_app():
         item = Item.query.get_or_404(item_id)
         if item.owner_id != current_user.id:
             return jsonify(error="Forbidden"), 403
+
         data = request.get_json(force=True)
         if 'title' in data:
             item.title = data['title']
@@ -450,11 +480,12 @@ def create_app():
             if not Category.query.get(data['category_id']):
                 return jsonify(error="category_id not found"), 404
             item.category_id = data['category_id']
+
         db.session.commit()
         resp = item.to_dict()
         resp['owner_id'] = item.owner_id
         return jsonify(resp), 200
-    
+
     # Delete an item (only its owner can)
     @app.route('/items/<int:item_id>', methods=['DELETE'])
     @login_required
@@ -462,11 +493,12 @@ def create_app():
         item = Item.query.get_or_404(item_id)
         if item.owner_id != current_user.id:
             return jsonify(error="Forbidden"), 403
+
         db.session.delete(item)
         db.session.commit()
         return '', 204
     
-    # List all items (with optional ?category_id= filter)
+     # List all items (with optional ?category_id= filter)
     @app.route('/items', methods=['GET'])
     def list_items():
         cid = request.args.get('category_id', type=int)

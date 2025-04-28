@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Delete Account{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Delete Account</h2>
+  <p class="text-danger">
+    This is irreversible! All your data (items, auctions, bids, alerts…) will be permanently removed.
+  </p>
+
+  {% with messages = get_flashed_messages(category_filter=["danger"]) %}
+    {% if messages %}
+      <div class="alert alert-danger">
+        {{ messages[0] }}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="post">
+    <div class="form-group">
+      <label for="password">Confirm with your password</label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        class="form-control"
+        required
+      >
+    </div>
+    <button type="submit" class="btn btn-danger">Delete My Account</button>
+    <a href="{{ url_for('user_detail', id=current_user.id) }}"
+       class="btn btn-secondary ml-2">Cancel</a>
+  </form>
+</div>
+{% endblock %}

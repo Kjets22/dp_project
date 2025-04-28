@@ -1,10 +1,11 @@
 # app/__init__.py
 from sqlalchemy import or_
-from flask import Flask, jsonify, redirect, request, render_template, url_for, flash
+from flask import Flask, jsonify, redirect, request, render_template, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_apscheduler import APScheduler
+from werkzeug.security import check_password_hash
 
 db = SQLAlchemy()
 login = LoginManager()
@@ -468,6 +469,33 @@ def create_app():
         db.session.commit()
 
         return redirect(url_for('auth_login'))
+    
+    @app.route('/auth/delete', methods=['GET'])
+    @login_required
+    def auth_delete():
+        # only allow yourself
+        if current_user.is_authenticated:
+            return render_template('auth/delete.html')
+        return redirect(url_for('auth_login'))
+
+    # Process deletion
+    @app.route('/auth/delete', methods=['POST'])
+    @login_required
+    def auth_delete_post():
+        pwd = request.form.get('password', '')
+        user = User.query.get(current_user.id)
+
+        # check password
+        if not user or not user.check_password(pwd):
+            flash('Password incorrect. Account not deleted.', 'danger')
+            return render_template('auth/delete.html'), 400
+
+        # delete user and cascade all related objects
+        logout_user()
+        db.session.delete(user)
+        db.session.commit()
+        flash('Your account and all associated data have been removed.', 'success')
+        return redirect(url_for('home'))
     
     @app.route("/auth/check_username", methods=["GET"])
     def check_username():

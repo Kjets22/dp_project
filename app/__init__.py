@@ -181,7 +181,11 @@ def create_app():
     
     @app.route('/auctions', methods=['GET'])
     def list_auctions():
-        all_aucs = Auction.query.all()
+        status = request.args.get('status')
+        q = Auction.query
+        if status in ('open', 'closed'):
+            q = q.filter_by(status=status)
+        all_aucs = q.all()
         return jsonify([{
             'id':            a.id,
             'item_id':       a.item_id,
@@ -192,15 +196,30 @@ def create_app():
             'increment':     a.increment,
             'reserve_price': a.reserve_price,
             'status':        a.status,
-        } for a in all_aucs])
+        } for a in all_aucs]), 200
+
     
     
     @app.route('/auctions/<int:auc_id>', methods=['GET'])
     def get_auction(auc_id):
-        a = Auction.query.get(auc_id)
-        if not a:
-            return jsonify(error="Auction not found"), 404
-        return jsonify({
+        a = Auction.query.get_or_404(auc_id)
+    
+        # pull all bids for this auction, highest‐first
+        bids = Bid.query.filter_by(auction_id=auc_id)\
+                        .order_by(Bid.amount.desc()).all()
+        bid_list = [{
+            'id':        b.id,
+            'bidder':    b.bidder,
+            'amount':    b.amount,
+            'max_bid':   b.max_bid,
+            'timestamp': b.timestamp.isoformat()
+        } for b in bids]
+    
+        # compute current high bid (or init_price if none)
+        current_high = bids[0].amount if bids else a.init_price
+    
+        # build response
+        resp = {
             'id':            a.id,
             'item_id':       a.item_id,
             'seller_id':     a.seller_id,
@@ -210,8 +229,22 @@ def create_app():
             'increment':     a.increment,
             'reserve_price': a.reserve_price,
             'status':        a.status,
-        }) 
-    # -------------- (keep your existing routes) ----------------
+            'current_high':  current_high,
+            'bids':          bid_list
+        }
+    
+        # if auction closed, also include winner & winning_bid
+        if a.status == 'closed':
+            if bids:
+                resp['winner']      = bids[0].bidder
+                resp['winning_bid'] = bids[0].amount
+            else:
+                resp['winner']      = None
+                resp['winning_bid'] = None
+    
+        return jsonify(resp), 200
+    
+     # -------------- (keep your existing routes) ----------------
     from app.models import User, Category, Item, Auction, Bid, Alert
 
     @app.route("/users", methods=["GET"])
@@ -639,8 +672,26 @@ def create_app():
         return jsonify(username=u.username), 201
 
     
-    # # Create a new item
-    @app.route("/items/create", methods=["GET","POST"])
+    # Update a category (only logged-in users)
+    @app.route('/categories/<int:cat_id>', methods=['PUT'])
+    @login_required
+    def update_category(cat_id):
+        cat = Category.query.get_or_404(cat_id)
+        data = request.get_json(force=True)
+        # allow changing name
+        if 'name' in data:
+            cat.name = data['name']
+        # allow reparenting (or removing parent)
+        if 'parent_id' in data:
+            parent_id = data['parent_id']
+            if parent_id is not None and not Category.query.get(parent_id):
+                return jsonify(error="parent_id not found"), 404
+            cat.parent_id = parent_id
+        db.session.commit()
+        return jsonify(cat.to_dict()), 200
+
+    # Create a new item
+    @app.route('/items', methods=['POST'])
     @login_required
     def create_item_form():
         # load all categories for the dropdown
@@ -711,6 +762,7 @@ def create_app():
     #     db.session.commit()
     #     return jsonify(item.to_dict()), 201
     
+    # Update an item (only its owner can)
     
     # Update an item (only its owner can)
     @app.route('/items/<int:item_id>', methods=['PUT'])
@@ -719,6 +771,7 @@ def create_app():
         item = Item.query.get_or_404(item_id)
         if item.owner_id != current_user.id:
             return jsonify(error="Forbidden"), 403
+
         data = request.get_json(force=True)
         if 'title' in data:
             item.title = data['title']
@@ -728,9 +781,12 @@ def create_app():
             if not Category.query.get(data['category_id']):
                 return jsonify(error="category_id not found"), 404
             item.category_id = data['category_id']
+
         db.session.commit()
-        return jsonify(item.to_dict()), 200
-    
+        resp = item.to_dict()
+        resp['owner_id'] = item.owner_id
+        return jsonify(resp), 200
+
     # Delete an item (only its owner can)
     @app.route('/items/<int:item_id>', methods=['DELETE'])
     @login_required
@@ -738,11 +794,12 @@ def create_app():
         item = Item.query.get_or_404(item_id)
         if item.owner_id != current_user.id:
             return jsonify(error="Forbidden"), 403
+
         db.session.delete(item)
         db.session.commit()
         return '', 204
     
-    # List all items (with optional ?category_id= filter)
+     # List all items (with optional ?category_id= filter)
     @app.route('/items', methods=['GET'])
     def list_items():
         cid = request.args.get('category_id', type=int)

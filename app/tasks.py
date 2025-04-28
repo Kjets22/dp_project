@@ -5,21 +5,23 @@ from flask import current_app
 from app import db
 from app.models import Auction, Alert, Item
 
+
 def close_auctions():
     """
     Closes all auctions whose end_time has passed by setting status to 'closed'.
-    Logs how many auctions were closed.
     """
     now = datetime.utcnow()
-    # Mark all open auctions past their end_time as closed
-    num_closed = (
-        Auction.query
-        .filter(Auction.status == 'open', Auction.end_time < now)
-        .update({'status': 'closed'})
-    )
+    open_aucs = Auction.query.filter_by(status='open').all()
+    num_closed = 0
+
+    for a in open_aucs:
+        if a.end_time < now:
+            a.status = 'closed'
+            num_closed += 1
+
     db.session.commit()
     current_app.logger.info(f"Closed {num_closed} auctions at {now.isoformat()}")
-
+    
 def process_alerts():
     """
     Evaluates each Alert.criteria_json against the Item table.

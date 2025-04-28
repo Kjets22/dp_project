@@ -3,59 +3,79 @@
 
 {% block content %}
 <div class="container mt-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat,msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
   <h2>Auction #{{ auction.id }} for “{{ item.title }}”</h2>
   <p><strong>Description:</strong> {{ item.description or "—" }}</p>
-
   <hr>
-  <!-- Current price display -->
   <p>
     <strong>Current Price:</strong> {{ current_price }}<br>
     <strong>Increment:</strong> {{ auction.increment }}
   </p>
 
-  <!-- Bidding form -->
-  {% if auction.status == 'open' and current_user.is_authenticated %}
-    <div class="card mb-4">
-      <div class="card-body">
-        <h5 class="card-title">Place a New Bid</h5>
-        <form method="post">
-          <div class="form-group">
-            <label for="bid_amount">
-              Your Bid (min {{ (current_price + auction.increment) | round(2) }})
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              name="bid_amount"
-              id="bid_amount"
-              class="form-control"
-              required
-            >
-          </div>
-          <button type="submit" class="btn btn-primary">
-            Submit Bid
-          </button>
-        </form>
+  {# only show bidding UI when open #}
+  {% if auction.status == 'open' %}
+    {# 1) seller blocked #}
+    {% if current_user.id == auction.seller_id %}
+      <div class="alert alert-warning">
+        You’re the seller — you cannot bid here.
       </div>
-    </div>
-  {% elif auction.status != 'open' %}
+
+    {# 2) highest bidder blocked #}
+    {% elif highest_bidder == current_user.username %}
+      <div class="alert alert-info">
+        You’re currently the highest bidder.
+      </div>
+
+    {# 3) otherwise, show the form #}
+    {% else %}
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title">Place a New Bid</h5>
+          <form method="post">
+            <div class="form-group">
+              <label for="bid_amount">
+                Your Bid
+                (min {{ (current_price + auction.increment)|round(2) }})
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                name="bid_amount"
+                id="bid_amount"
+                class="form-control"
+                required
+                min="{{ (current_price + auction.increment)|round(2) }}"
+                value="{{ (current_price + auction.increment)|round(2) }}"
+              >
+            </div>
+            <button type="submit" class="btn btn-primary">
+              Submit Bid
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
     <div class="alert alert-secondary">
       This auction is closed.
     </div>
   {% endif %}
 
-  <!-- Bid history -->
+  <hr>
   <h4>Bids</h4>
   {% if bids %}
     <ul class="list-group mb-4">
       {% for bid in bids %}
         <li class="list-group-item d-flex justify-content-between">
-          <span>
-            <strong>{{ bid.bidder }}</strong> bid {{ bid.amount }}
-          </span>
-          <small class="text-muted">
-            {{ bid.timestamp.strftime('%b %-d, %Y %H:%M') }}
-          </small>
+          <span><strong>{{ bid.bidder }}</strong> bid {{ bid.amount }}</span>
+          <small class="text-muted">{{ bid.timestamp.strftime('%b %-d, %Y %H:%M') }}</small>
         </li>
       {% endfor %}
     </ul>

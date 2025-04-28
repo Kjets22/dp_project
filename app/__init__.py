@@ -121,17 +121,37 @@ def create_app():
         auction = Auction.query.get_or_404(auc_id)
         item    = auction.item
 
-        # compute current price
-        highest_bid = db.session.query(db.func.max(Bid.amount)) \
-                    .filter_by(auction_id=auc_id).scalar()
-        current_price = highest_bid if highest_bid is not None else auction.init_price
+        # 1) compute current price & highest‐bidder
+        highest_bid_record = (
+            Bid.query
+            .filter_by(auction_id=auc_id)
+            .order_by(Bid.amount.desc())
+            .first()
+        )
+        if highest_bid_record:
+            current_price  = highest_bid_record.amount
+            highest_bidder = highest_bid_record.bidder
+        else:
+            current_price  = auction.init_price
+            highest_bidder = None
 
-        # handle new bid POST
+        # 2) process new‐bid POST
         if request.method == "POST":
+            # a) owner can’t bid on own auction
+            if current_user.id == auction.seller_id:
+                flash("You cannot bid on your own auction.", "danger")
+                return redirect(url_for("auction_detail", auc_id=auc_id))
+
+            # b) highest bidder can’t outbid themself
+            if highest_bidder == current_user.username:
+                flash("You’re already the highest bidder.", "warning")
+                return redirect(url_for("auction_detail", auc_id=auc_id))
+
+            # c) parse & validate amount
             try:
-                new_amount = float(request.form.get("bid_amount", 0))
-            except ValueError:
-                flash("Please enter a numeric bid.", "danger")
+                new_amount = float(request.form["bid_amount"])
+            except (KeyError, ValueError):
+                flash("Please enter a valid number.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
             required_min = current_price + auction.increment
@@ -139,26 +159,32 @@ def create_app():
                 flash(f"Your bid must be at least {required_min:.2f}.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
-            # record bid
+            # d) record the bid
             b = Bid(
                 auction_id=auc_id,
-                bidder=current_user.username,
-                amount=new_amount
+                bidder=     current_user.username,
+                amount=     new_amount
             )
             db.session.add(b)
             db.session.commit()
             flash("Your bid was placed!", "success")
             return redirect(url_for("auction_detail", auc_id=auc_id))
 
-        # GET → render template
-        bids = Bid.query.filter_by(auction_id=auc_id) \
-                        .order_by(Bid.timestamp.desc()).all()
-
-        return render_template("auctions/detail.html",
-                            auction=auction,
-                            item=item,
-                            bids=bids,
-                            current_price=current_price)
+        # 3) GET → render
+        bids = (
+            Bid.query
+            .filter_by(auction_id=auc_id)
+            .order_by(Bid.timestamp.desc())
+            .all()
+        )
+        return render_template(
+            "auctions/detail.html",
+            auction=auction,
+            item=item,
+            bids=bids,
+            current_price=current_price,
+            highest_bidder=highest_bidder
+        )
     
     @app.route('/auctions', methods=['GET'])
     def list_auctions():

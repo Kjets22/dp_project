@@ -804,47 +804,27 @@ def create_app():
 
     @app.route('/browse', methods=['GET'])
     def browse():
-        # pull query params
-        q           = request.args.get('q', '').strip()
-        category_id = request.args.get('category_id', type=int)
-        min_price   = request.args.get('min_price', type=float)
-        max_price   = request.args.get('max_price', type=float)
+        q            = request.args.get('q', '').strip()
+        category_id  = request.args.get('category_id', type=int)
 
-        # show nothing until the user actually searches or picks a filter
-        if not (q or category_id or min_price is not None or max_price is not None):
-            return render_template(
-                'browse.html',
-                items=[],
-                q=q,
-                categories=Category.query.order_by(Category.name).all(),
-                selected_category=category_id,
-                min_price=min_price,
-                max_price=max_price
-            )
+        # always start from the Item→Auction join so we can show auction info
+        query = (
+            Item.query
+                .outerjoin(Auction, (Auction.item_id == Item.id) & (Auction.status == 'open'))
+        )
 
-        # build the query
-        query = Item.query
-
-        # text search on title or description
+        # text search
         if q:
             query = query.filter(or_(
                 Item.title.ilike(f'%{q}%'),
                 Item.description.ilike(f'%{q}%')
             ))
 
-        # filter by category if given
+        # category filter
         if category_id:
-            query = query.filter_by(category_id=category_id)
+            query = query.filter(Item.category_id == category_id)
 
-        # only show items with an open auction
-        query = query.join(Auction, (Auction.item_id == Item.id) & (Auction.status == 'open'))
-
-        # filter by auction’s starting price as an approximation for “price range”
-        if min_price is not None:
-            query = query.filter(Auction.init_price >= min_price)
-        if max_price is not None:
-            query = query.filter(Auction.init_price <= max_price)
-
+        # finally, pull all matching items (or *all* if no filters)
         items = query.order_by(Item.id.desc()).all()
 
         return render_template(
@@ -852,8 +832,6 @@ def create_app():
             items=items,
             q=q,
             categories=Category.query.order_by(Category.name).all(),
-            selected_category=category_id,
-            min_price=min_price,
-            max_price=max_price
+            selected_category=category_id
         )
     return app

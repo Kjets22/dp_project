@@ -115,6 +115,30 @@ def create_app():
     #     return jsonify(id=a.id), 201
     
     
+    @app.route("/auctions/<int:auc_id>/detail", methods=["GET"])
+    @login_required
+    def auction_detail(auc_id):
+        # fetch auction or 404
+        auction = Auction.query.get_or_404(auc_id)
+
+        # load the related item
+        item = auction.item
+
+        # all bids for this auction, newest first
+        bids = (
+            Bid.query
+            .filter_by(auction_id=auc_id)
+            .order_by(Bid.timestamp.desc())
+            .all()
+        )
+
+        return render_template(
+            "auctions/detail.html",
+            auction=auction,
+            item=item,
+            bids=bids
+        )
+    
     @app.route('/auctions', methods=['GET'])
     def list_auctions():
         all_aucs = Auction.query.all()

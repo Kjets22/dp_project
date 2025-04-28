@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Auction #{{ auction.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Auction #{{ auction.id }} for “{{ item.title }}”</h2>
+  <p><strong>Description:</strong> {{ item.description or "—" }}</p>
+  <p>
+    <strong>Category:</strong> {{ item.category.name }}<br>
+    <strong>Seller:</strong>
+      <a href="{{ url_for('user_detail', id=auction.seller.id) }}">
+        {{ auction.seller.username }}
+      </a><br>
+    <strong>Start:</strong> {{ auction.start_time.strftime('%b %-d, %Y %H:%M') }}<br>
+    <strong>End:</strong>   {{ auction.end_time.strftime('%b %-d, %Y %H:%M') }}<br>
+    <strong>Status:</strong> {{ auction.status }}<br>
+    <strong>Starting Price:</strong> {{ auction.init_price }}<br>
+    <strong>Increment:</strong> {{ auction.increment }}<br>
+    <strong>Reserve Price:</strong> {{ auction.reserve_price }}
+  </p>
+
+  <hr>
+  <h4>Bids</h4>
+  {% if bids %}
+    <ul class="list-group mb-4">
+      {% for bid in bids %}
+        <li class="list-group-item d-flex justify-content-between">
+          <span>
+            <strong>{{ bid.bidder }}</strong>
+            bid {{ bid.amount }}
+          </span>
+          <small class="text-muted">
+            {{ bid.timestamp.strftime('%b %-d, %Y %H:%M') }}
+          </small>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">No bids have been placed yet.</p>
+  {% endif %}
+
+  <a href="{{ url_for('user_detail', id=current_user.id) }}"
+     class="btn btn-outline-secondary">
+    ← Back to My Page
+  </a>
+</div>
+{% endblock %}

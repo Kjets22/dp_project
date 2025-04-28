@@ -39,7 +39,7 @@
           Auction #{{ a.id }} for &ldquo;{{ a.item.title }}&rdquo; —
           ends {{ a.end_time.strftime('%b %-d, %Y %H:%M') }} —
           status: {{ a.status }}
-          <a href="{{ url_for('get_auction', auc_id=a.id) }}" class="float-right">View</a>
+          <a href="{{ url_for('auction_detail', auc_id=a.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
         </li>
       {% endfor %}
     </ul>
@@ -61,7 +61,7 @@
             {% set max_bid = your_bids | map(attribute='amount') | max %}
             {{ max_bid }} —
           ends {{ a.end_time.strftime('%b %-d, %Y %H:%M') }}
-          <a href="{{ url_for('get_auction', auc_id=a.id) }}" class="float-right">View</a>
+          <a href="{{ url_for('auction_detail', auc_id=a.id) }}" class="btn btn-sm btn-outline-secondary">View</a>
         </li>
       {% endfor %}
     </ul>

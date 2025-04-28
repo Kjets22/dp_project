@@ -20,7 +20,7 @@
           Auction #{{ auc.id }} —
           ends {{ auc.end_time.strftime('%b %-d, %Y %H:%M') }} —
           status: {{ auc.status }}
-          <a href="{{ url_for('get_auction', auc_id=auc.id) }}" class="btn btn-sm btn-outline-secondary">
+          <a href="{{ url_for('auction_detail', auc_id=auc.id) }}" class="btn btn-sm btn-outline-secondary">
             View
           </a>
         </li>

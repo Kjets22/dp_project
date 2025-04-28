@@ -296,6 +296,15 @@ def create_app():
         flash("Account created successfully! Please log in.", "success")
         return redirect(url_for('auth_login'))
     
+    @app.route("/auth/check_username", methods=["GET"])
+    def check_username():
+        uname = request.args.get("username", "").strip()
+        if not uname:
+            return jsonify(error="No username provided"), 400
+
+        taken = User.query.filter_by(username=uname).first() is not None
+        return jsonify(available=not taken), 200
+    
     # @app.route('/auth/login', methods=['GET'])
     # def auth_login_form():
     #     return render_template('/auth/login.html')
@@ -445,16 +454,20 @@ def create_app():
         process_alerts()
         return "Alerts processed", 200
 
-    @app.route("/users/<string:username>", methods=["POST"])
-    def create_user(username):
-        if User.query.filter_by(username=username).first():
-            return jsonify(error="User already exists"), 400
-        u = User(username=username)
-        db.session.add(u); db.session.commit()
-        return jsonify(username=u.username), 201
+    # @app.route("/users/<string:username>", methods=["POST"])
+    # def create_user(username):
+    #     if User.query.filter_by(username=username).first():
+    #         return jsonify(error="User already exists"), 400
+    #     u = User(username=username)
+    #     db.session.add(u); db.session.commit()
+    #     return jsonify(username=u.username), 201
 
     
     # Create a new item
+    @app.route('/items', methods=['GET'])
+    def create_item_form():
+        return render_template("/items/create.html")
+        
     @app.route('/items', methods=['POST'])
     def create_item():
         data = request.get_json(force=True)
@@ -497,40 +510,6 @@ def create_app():
     @app.route("/")
     def home():
         return render_template("index.html")
-
-    # @app.route("/login", methods=["GET", "POST"])
-    # def login():
-    #     if request.method == "POST":
-    #         user_id = request.form["id"]
-    #         password = request.form["password"]
-
-    #         user = db.session.query(User).filter_by(user_id=user_id).first()
-
-    #         if user and user.password == password:
-    #             print("Is this working?")
-    #             print(app.secret_key)
-    #             # session["user_uid"] = user.uid
-    #             # #TODO: Refresh after done
-    #             # flash("Login successful!", "success")
-    #             return redirect(url_for("user_detail", uid=user.id))
-    #         # else:
-    #         #     flash("Invalid username or password", "danger")
-
-    #     return render_template("login.html")
-    
-    # @app.route("/login", methods=["GET","POST"])
-    # def login():
-    #     if request.method=="POST":
-    #         data     = request.form
-    #         username = data.get("username","").strip()
-    #         password = data.get("password","")
-    #         user = User.query.filter_by(username=username).first()
-    #         if user and check_password_hash(user.password_hash,password):
-    #             session["user_id"] = user.id
-    #             flash("Login successful!","success")
-    #             return redirect(url_for("user_detail", id=user.id))
-    #         flash("Invalid credentials","danger")
-    #     return render_template("login.html")
 
     
     return app

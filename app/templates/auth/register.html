@@ -11,7 +11,6 @@
       </div>
       <div class="card-body">
         <form method="post" action="{{ url_for('auth_register') }}">
-          <!-- Username (login name) -->
           <div class="form-group">
             <label>Username</label>
             <input
@@ -89,7 +88,7 @@ async function checkUsername() {
   }
 
   try {
-    const res = await fetch(`/check_username?username=${encodeURIComponent(uname)}`);
+    const res = await fetch(`/auth/check_username?username=${encodeURIComponent(uname)}`);
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || "Server error");

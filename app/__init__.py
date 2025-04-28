@@ -331,8 +331,9 @@ def create_app():
     @app.route('/auth/logout', methods=['POST'])
     @login_required
     def auth_logout():
-        logout_user()
-        return jsonify(message="Logged out"), 200
+        if  request.method == "POST":
+            logout_user()
+        return render_template("/auth/logout.html")
 
     # -----------------------
     # Bidding Endpoints

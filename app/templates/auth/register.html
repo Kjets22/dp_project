@@ -97,10 +97,10 @@ async function checkUsername() {
     const { available } = await res.json();
 
     if (available) {
-      resultDiv.textContent = "✅ Username is available!";
+      resultDiv.textContent = "Username is available!";
       resultDiv.classList.add("text-success");
     } else {
-      resultDiv.textContent = "❌ Username is already taken.";
+      resultDiv.textContent = "Username is already taken.";
       resultDiv.classList.add("text-danger");
     }
 

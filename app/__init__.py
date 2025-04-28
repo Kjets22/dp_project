@@ -115,29 +115,50 @@ def create_app():
     #     return jsonify(id=a.id), 201
     
     
-    @app.route("/auctions/<int:auc_id>/detail", methods=["GET"])
+    @app.route("/auctions/<int:auc_id>/detail", methods=["GET","POST"])
     @login_required
     def auction_detail(auc_id):
-        # fetch auction or 404
         auction = Auction.query.get_or_404(auc_id)
+        item    = auction.item
 
-        # load the related item
-        item = auction.item
+        # compute current price
+        highest_bid = db.session.query(db.func.max(Bid.amount)) \
+                    .filter_by(auction_id=auc_id).scalar()
+        current_price = highest_bid if highest_bid is not None else auction.init_price
 
-        # all bids for this auction, newest first
-        bids = (
-            Bid.query
-            .filter_by(auction_id=auc_id)
-            .order_by(Bid.timestamp.desc())
-            .all()
-        )
+        # handle new bid POST
+        if request.method == "POST":
+            try:
+                new_amount = float(request.form.get("bid_amount", 0))
+            except ValueError:
+                flash("Please enter a numeric bid.", "danger")
+                return redirect(url_for("auction_detail", auc_id=auc_id))
 
-        return render_template(
-            "auctions/detail.html",
-            auction=auction,
-            item=item,
-            bids=bids
-        )
+            required_min = current_price + auction.increment
+            if new_amount < required_min:
+                flash(f"Your bid must be at least {required_min:.2f}.", "danger")
+                return redirect(url_for("auction_detail", auc_id=auc_id))
+
+            # record bid
+            b = Bid(
+                auction_id=auc_id,
+                bidder=current_user.username,
+                amount=new_amount
+            )
+            db.session.add(b)
+            db.session.commit()
+            flash("Your bid was placed!", "success")
+            return redirect(url_for("auction_detail", auc_id=auc_id))
+
+        # GET → render template
+        bids = Bid.query.filter_by(auction_id=auc_id) \
+                        .order_by(Bid.timestamp.desc()).all()
+
+        return render_template("auctions/detail.html",
+                            auction=auction,
+                            item=item,
+                            bids=bids,
+                            current_price=current_price)
     
     @app.route('/auctions', methods=['GET'])
     def list_auctions():

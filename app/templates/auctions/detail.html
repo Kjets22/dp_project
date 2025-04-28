@@ -5,29 +5,53 @@
 <div class="container mt-4">
   <h2>Auction #{{ auction.id }} for “{{ item.title }}”</h2>
   <p><strong>Description:</strong> {{ item.description or "—" }}</p>
-  <p>
-    <strong>Category:</strong> {{ item.category.name }}<br>
-    <strong>Seller:</strong>
-      <a href="{{ url_for('user_detail', id=auction.seller.id) }}">
-        {{ auction.seller.username }}
-      </a><br>
-    <strong>Start:</strong> {{ auction.start_time.strftime('%b %-d, %Y %H:%M') }}<br>
-    <strong>End:</strong>   {{ auction.end_time.strftime('%b %-d, %Y %H:%M') }}<br>
-    <strong>Status:</strong> {{ auction.status }}<br>
-    <strong>Starting Price:</strong> {{ auction.init_price }}<br>
-    <strong>Increment:</strong> {{ auction.increment }}<br>
-    <strong>Reserve Price:</strong> {{ auction.reserve_price }}
-  </p>
 
   <hr>
+  <!-- Current price display -->
+  <p>
+    <strong>Current Price:</strong> {{ current_price }}<br>
+    <strong>Increment:</strong> {{ auction.increment }}
+  </p>
+
+  <!-- Bidding form -->
+  {% if auction.status == 'open' and current_user.is_authenticated %}
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title">Place a New Bid</h5>
+        <form method="post">
+          <div class="form-group">
+            <label for="bid_amount">
+              Your Bid (min {{ (current_price + auction.increment) | round(2) }})
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              name="bid_amount"
+              id="bid_amount"
+              class="form-control"
+              required
+            >
+          </div>
+          <button type="submit" class="btn btn-primary">
+            Submit Bid
+          </button>
+        </form>
+      </div>
+    </div>
+  {% elif auction.status != 'open' %}
+    <div class="alert alert-secondary">
+      This auction is closed.
+    </div>
+  {% endif %}
+
+  <!-- Bid history -->
   <h4>Bids</h4>
   {% if bids %}
     <ul class="list-group mb-4">
       {% for bid in bids %}
         <li class="list-group-item d-flex justify-content-between">
           <span>
-            <strong>{{ bid.bidder }}</strong>
-            bid {{ bid.amount }}
+            <strong>{{ bid.bidder }}</strong> bid {{ bid.amount }}
           </span>
           <small class="text-muted">
             {{ bid.timestamp.strftime('%b %-d, %Y %H:%M') }}

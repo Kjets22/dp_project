@@ -451,7 +451,9 @@ def create_app():
                 return jsonify(error="category_id not found"), 404
             item.category_id = data['category_id']
         db.session.commit()
-        return jsonify(item.to_dict()), 200
+        resp = item.to_dict()
+        resp['owner_id'] = item.owner_id
+        return jsonify(resp), 200
     
     # Delete an item (only its owner can)
     @app.route('/items/<int:item_id>', methods=['DELETE'])

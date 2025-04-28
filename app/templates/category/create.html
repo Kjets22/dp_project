@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}New Category{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Create Category</h2>
+  <form method="post" action="{{ url_for('create_category_form') }}">
+    <!-- Category Name -->
+    <div class="form-group">
+      <label for="name">Category Name</label>
+      <input
+        type="text"
+        id="name"
+        name="name"
+        class="form-control"
+        placeholder="e.g. Electronics"
+        required
+      >
+    </div>
+
+    <!-- Optional Parent Category -->
+    <div class="form-group">
+      <label for="parent_id">Parent Category (optional)</label>
+      <select id="parent_id" name="parent_id" class="form-control">
+        <option value="" selected>— None —</option>
+        {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit" class="btn btn-success">
+      Add Category
+    </button>
+    <a href="{{ url_for('create_item_form') }}" class="btn btn-link">
+      ← Back to Create Item
+    </a>
+  </form>
+</div>
+{% endblock %}

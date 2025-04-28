@@ -104,28 +104,52 @@ def create_app():
     def list_users():
         return jsonify([u.username for u in User.query.all()]), 200
     
-    # Create a new category (optionally as a subcategory)
-    @app.route('/categories', methods=['POST'])
-    def create_category():
-        data = request.get_json(force=True)
-        name = data.get('name')
-        parent_id = data.get('parent_id')  # optional
-        if not name:
-            return jsonify(error="name is required"), 400
-        # verify parent exists if given
-        if parent_id is not None and not Category.query.get(parent_id):
-            return jsonify(error="parent_id not found"), 404
+    # # Create a new category (optionally as a subcategory)
+    @app.route("/categories/create", methods=["GET","POST"])
+    @login_required
+    def create_category_form():
+        # pass existing categories if you want to allow nesting
+        categories = Category.query.order_by(Category.name).all()
+
+        if request.method == "POST":
+            name      = request.form.get("name","").strip()
+            parent_id = request.form.get("parent_id", type=int) or None
+
+            if not name:
+                flash("Category name required.", "danger")
+                return redirect(url_for("create_category_form"))
+
+            cat = Category(name=name, parent_id=parent_id)
+            db.session.add(cat)
+            db.session.commit()
+            flash(f"Category “{name}” added!", "success")
+            return redirect(url_for("create_item_form"))
+
+        return render_template(
+            "category/create.html",
+            categories=categories
+        )
+    # @app.route('/categories', methods=['POST'])
+    # def create_category():
+    #     data = request.get_json(force=True)
+    #     name = data.get('name')
+    #     parent_id = data.get('parent_id')  # optional
+    #     if not name:
+    #         return jsonify(error="name is required"), 400
+    #     # verify parent exists if given
+    #     if parent_id is not None and not Category.query.get(parent_id):
+    #         return jsonify(error="parent_id not found"), 404
     
-        cat = Category(name=name, parent_id=parent_id)
-        db.session.add(cat)
-        db.session.commit()
-        return jsonify(cat.to_dict()), 201
+    #     cat = Category(name=name, parent_id=parent_id)
+    #     db.session.add(cat)
+    #     db.session.commit()
+    #     return jsonify(cat.to_dict()), 201
     
-    # List all categories
-    @app.route('/categories', methods=['GET'])
-    def list_categories():
-        cats = Category.query.all()
-        return jsonify([c.to_dict() for c in cats]), 200
+    # # List all categories
+    # @app.route('/categories', methods=['GET'])
+    # def list_categories():
+    #     cats = Category.query.all()
+    #     return jsonify([c.to_dict() for c in cats]), 200
     
     # Get a single category (with its children)
     @app.route('/categories/<int:cat_id>', methods=['GET'])
@@ -339,9 +363,38 @@ def create_app():
         return redirect(url_for('user_detail', id=user.id))
     
     @app.route("/auth/<int:id>", methods=["GET"])
+    @login_required
     def user_detail(id):
+        # fetch the user or 404
         user = User.query.get_or_404(id)
-        return render_template("/auth/detail.html", user=user)
+
+        # 1) Auctions they created
+        created_aucs = Auction.query.filter_by(seller_id=user.id).all()
+
+        # 2) Auctions they've bid on
+        participated = (
+            Auction.query
+                   .join(Bid, Bid.auction_id == Auction.id)
+                   .filter(Bid.bidder == user.username)
+                   .filter(Auction.seller_id != user.id)
+                   .distinct()
+                   .all()
+        )
+
+        # 3) Items they own
+        created_items = user.items  # thanks to owner backref in Item model
+
+        return render_template(
+            "/auth/detail.html",
+            user=user,
+            created_items=created_items,
+            created_aucs=created_aucs,
+            participated=participated
+        )
+    # def user_detail(id):
+    #     user = User.query.get_or_404(id)
+    #     print(1)
+    #     return render_template("/auth/detail.html", user=user)
 
     @app.route('/auth/logout', methods=['POST'])
     @login_required
@@ -478,33 +531,74 @@ def create_app():
         return jsonify(username=u.username), 201
 
     
-    # Create a new item
-    @app.route('/items', methods=['GET'])
-    def create_item_form():
-        return render_template("/items/create.html")
-        
-    @app.route('/items', methods=['POST'])
+    # # Create a new item
+    @app.route("/items/create", methods=["GET","POST"])
     @login_required
-    def create_item():
-        data = request.get_json(force=True)
-        title       = data.get('title')
-        description = data.get('description')
-        category_id = data.get('category_id')
-        if not title or category_id is None:
-            return jsonify(error="title and category_id are required"), 400
-        if not Category.query.get(category_id):
-            return jsonify(error="category_id not found"), 404
-    
-       # link to the current user
-        item = Item(
-            title=title,
-            description=description,
-            category_id=category_id,
-            owner_id=current_user.id
+    def create_item_form():
+        # load all categories for the dropdown
+        categories = Category.query.order_by(Category.name).all()
+
+        if request.method == "POST":
+            title       = request.form.get("title", "").strip()
+            description = request.form.get("description", "").strip()
+            category_id = request.form.get("category_id", type=int)
+
+            # form validation
+            errors = []
+            if not title:
+                errors.append("Title is required.")
+            if not category_id or not Category.query.get(category_id):
+                errors.append("Please select a valid category.")
+
+            if errors:
+                for e in errors:
+                    flash(e, "danger")
+                return redirect(url_for("create_item_form"))
+
+            # create the item
+            item = Item(
+                title=title,
+                description=description,
+                category_id=category_id,
+                owner_id=current_user.id
+            )
+            db.session.add(item)
+            db.session.commit()
+            flash("Item created! Now you can create an auction for it.", "success")
+            # return redirect(url_for("list_items"))
+            return redirect(url_for("user_detail", id=current_user.id))
+
+        # GET → show the form
+        return render_template(
+            "items/create.html",
+            categories=categories
         )
-        db.session.add(item)
-        db.session.commit()
-        return jsonify(item.to_dict()), 201
+    # @app.route('/items', methods=['GET'])
+    # def create_item_form():
+    #     return render_template("/items/create.html")
+        
+    # @app.route('/items', methods=['POST'])
+    # @login_required
+    # def create_item():
+    #     data = request.get_json(force=True)
+    #     title       = data.get('title')
+    #     description = data.get('description')
+    #     category_id = data.get('category_id')
+    #     if not title or category_id is None:
+    #         return jsonify(error="title and category_id are required"), 400
+    #     if not Category.query.get(category_id):
+    #         return jsonify(error="category_id not found"), 404
+    
+    #    # link to the current user
+    #     item = Item(
+    #         title=title,
+    #         description=description,
+    #         category_id=category_id,
+    #         owner_id=current_user.id
+    #     )
+    #     db.session.add(item)
+    #     db.session.commit()
+    #     return jsonify(item.to_dict()), 201
     
     
     # Update an item (only its owner can)
@@ -524,9 +618,7 @@ def create_app():
                 return jsonify(error="category_id not found"), 404
             item.category_id = data['category_id']
         db.session.commit()
-        resp = item.to_dict()
-        resp['owner_id'] = item.owner_id
-        return jsonify(resp), 200
+        return jsonify(item.to_dict()), 200
     
     # Delete an item (only its owner can)
     @app.route('/items/<int:item_id>', methods=['DELETE'])

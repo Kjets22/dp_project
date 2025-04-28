@@ -1,21 +1,66 @@
 {% extends 'base.html' %}
-
-{% block title %}Create Bidding Auction{% endblock %}
+{% block title %}Create Item{% endblock %}
 
 {% block content %}
-<div class="container">
-  <h2>Create Product</h2>
+<div class="container mt-4">
+  <h2>Create Item</h2>
 
-  {# Use Flask-Login’s current_user instead of session #}
   {% if current_user.is_authenticated %}
-    <form method="post" enctype="multipart/form-data">
+    <form method="post">
+      <!-- Category dropdown + “New” button -->
       <div class="form-group">
-        <label>Description</label>
-        <textarea name="description" class="form-control" required></textarea>
+        <label for="category_id">Category</label>
+        <div class="input-group">
+          <select
+            id="category_id"
+            name="category_id"
+            class="form-control"
+            required
+          >
+            <option value="" disabled selected>– Select a category –</option>
+            {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="input-group-append">
+            <a
+              href="{{ url_for('create_category_form') }}"
+              class="btn btn-outline-secondary"
+            >+ New Category</a>
+          </div>
+        </div>
       </div>
+      
+      <!-- Title -->
       <div class="form-group">
-        <label>Starting Price</label>
+        <label for="title">Title</label>
         <input
+          id="title"
+          name="title"
+          type="text"
+          class="form-control"
+          placeholder="Enter item title"
+          required
+        >
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea
+          id="description"
+          name="description"
+          class="form-control"
+          rows="3"
+          required
+        ></textarea>
+      </div>
+
+      <!-- Starting Price -->
+      <div class="form-group">
+        <label for="price">Starting Price</label>
+        <input
+          id="price"
           type="number"
           step="0.01"
           name="price"
@@ -23,9 +68,12 @@
           required
         >
       </div>
+
+      <!-- Minimum Bidding Increment -->
       <div class="form-group">
-        <label>Minimum Bidding Increment</label>
+        <label for="min_bid_inc">Minimum Bidding Increment</label>
         <input
+          id="min_bid_inc"
           type="number"
           step="0.01"
           name="min_bid_inc"
@@ -33,25 +81,15 @@
           required
         >
       </div>
-      <div class="form-check">
-        <input
-          type="checkbox"
-          name="is_open_bid"
-          class="form-check-input"
-        >
-        <label class="form-check-label">
-          Open to Bids
-        </label>
-      </div>
 
-      <button type="submit" class="btn btn-primary mt-3">
-        Create Product
+      <button type="submit" class="btn btn-primary mt-3" href="{{ url_for('create_item_form')}}">
+        Create Item
       </button>
     </form>
 
   {% else %}
     <div class="alert alert-warning mt-4">
-      You must be logged in to create a product.
+      You must be logged in to create an item.
     </div>
     <a
       class="btn btn-outline-primary"

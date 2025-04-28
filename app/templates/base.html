@@ -21,8 +21,11 @@
       <a class="btn btn-outline-primary" href="/">Home</a>
 
       {% if current_user.is_authenticated %}
+        <a class="btn btn-outline-fix text-dark mr-2" href="{{ url_for('user_detail', id=current_user.id) }}">
+            My Page
+        </a>
         <!-- when logged in: show Create, Browse, and a Logout button -->
-        <a class="btn btn-outline-fix text-dark" href="{{ url_for('create_item') }}">
+        <a class="btn btn-outline-fix text-dark" href="{{ url_for('create_item_form') }}">
           Create
         </a>
         <a class="btn btn-outline-fix text-dark" href="/browse">

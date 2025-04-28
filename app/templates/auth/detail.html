@@ -1,30 +1,71 @@
 {% extends 'base.html' %}
-
-{% block title %}User Detail{% endblock %}
+{% block title %}{{ user.username }}’s Profile{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-  <div class="row justify-content-center">
-    <div class="col-lg-6">
-      <div class="card shadow-sm rounded-lg">
-        <div class="card-body">
-          <h4 class="card-title mb-4">👤 User Profile</h4>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
-              <strong>Username:</strong> {{ user.username }}
-            </li>
-            <li class="list-group-item">
-              <strong>Full Name:</strong> {{ user.full_name }}
-            </li>
-            <li class="list-group-item">
-              <strong>Date of Birth:</strong>
-              {{ user.date_of_birth.strftime('%B %d, %Y') }}
-            </li>
-          </ul>
-          <a href="/" class="btn btn-outline-primary mt-4">← Back to Home</a>
-        </div>
-      </div>
-    </div>
-  </div>
+  <h2>{{ user.full_name }} (<small>{{ user.username }}</small>)</h2>
+  <p><em>DOB: {{ user.date_of_birth.strftime('%B %-d, %Y') }}</em></p>
+
+  <hr>
+
+  <!-- Items Created -->
+  <h4>Your Items</h4>
+  {% if created_items %}
+    <ul class="list-group mb-4">
+      {% for item in created_items %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ item.title }}
+          <a href="{{ url_for('create_auction', item_id=item.id) }}" class="btn btn-sm btn-outline-primary">
+            Create Auction
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t created any items yet.</p>
+  {% endif %}
+
+  <hr>
+
+  <!-- Auctions Created -->
+  <h4>Your Auctions (Selling)</h4>
+  {% if created_aucs %}
+    <ul class="list-group mb-4">
+      {% for a in created_aucs %}
+        <li class="list-group-item">
+          Auction #{{ a.id }} for &ldquo;{{ a.item.title }}&rdquo; —
+          ends {{ a.end_time.strftime('%b %-d, %Y %H:%M') }} —
+          status: {{ a.status }}
+          <a href="{{ url_for('get_auction', auc_id=a.id) }}" class="float-right">View</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t started any auctions yet.</p>
+  {% endif %}
+
+  <hr>
+
+  <!-- Auctions Participated -->
+  <h4>Auctions You Bid On</h4>
+  {% if participated %}
+    <ul class="list-group">
+      {% for a in participated %}
+        <li class="list-group-item">
+          Auction #{{ a.id }} for &ldquo;{{ a.item.title }}&rdquo; —
+          your highest bid: 
+            {% set your_bids = a.bids | selectattr('bidder','equalto',user.username) | list %}
+            {% set max_bid = your_bids | map(attribute='amount') | max %}
+            {{ max_bid }} —
+          ends {{ a.end_time.strftime('%b %-d, %Y %H:%M') }}
+          <a href="{{ url_for('get_auction', auc_id=a.id) }}" class="float-right">View</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t placed any bids yet.</p>
+  {% endif %}
+
+  <a href="{{ url_for('home') }}" class="btn btn-outline-secondary mt-4">← Back to Home</a>
 </div>
 {% endblock %}

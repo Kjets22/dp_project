@@ -50,6 +50,7 @@ class Item(db.Model):
     title       = db.Column(db.String(128), nullable=False)
     description = db.Column(db.Text, nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    owner_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     # relationship back to Category
     category    = db.relationship('Category', backref=db.backref('items', lazy='dynamic'))
@@ -57,6 +58,7 @@ class Item(db.Model):
         'Auction', back_populates='item',
         cascade='all, delete-orphan'
     )
+    owner       = db.relationship('User', backref='items')     
     
     def to_dict(self):
         return {

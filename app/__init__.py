@@ -29,6 +29,9 @@ def create_app():
         from app.models import User
         return User.query.get(int(user_id))   
 
+    
+
+
     # --------------- Auction Endpoints ----------------
     @app.route("/auctions/open/<int:item_id>", methods=["GET","POST"])
     @login_required
@@ -242,10 +245,32 @@ def create_app():
 
     @app.route('/auctions', methods=['GET'])
     def list_auctions():
-        status = request.args.get('status')
-        q = Auction.query
+        # --- optional filters from query string ---
+        status      = request.args.get('status')              # open/closed
+        title       = request.args.get('title')               # substring match on item title
+        description = request.args.get('description')         # substring match on item description
+        category_id = request.args.get('category_id', type=int)
+        min_price   = request.args.get('min_price',   type=float)
+        max_price   = request.args.get('max_price',   type=float)
+
+        # join Auction → Item so we can filter on item fields
+        q = Auction.query.join(Item)
+
+        # auction‐level filters
         if status in ('open', 'closed'):
-            q = q.filter_by(status=status)
+            q = q.filter(Auction.status == status)
+        if min_price is not None:
+            q = q.filter(Auction.init_price >= min_price)
+        if max_price is not None:
+            q = q.filter(Auction.init_price <= max_price)
+
+        # item‐level filters
+        if title:
+            q = q.filter(Item.title.ilike(f'%{title}%'))
+        if description:
+            q = q.filter(Item.description.ilike(f'%{description}%'))
+        if category_id:
+            q = q.filter(Item.category_id == category_id)        
         all_aucs = q.all()
         return jsonify([{
             'id':            a.id,
@@ -260,12 +285,43 @@ def create_app():
         } for a in all_aucs]), 200
 
     
+    @app.route('/auctions/search', methods=['GET'])
+    def search_auctions():
+        # join Auction ⇆ Item so we can filter by item fields
+        q = Auction.query.join(Item)
+
+        # pull query-params
+        title       = request.args.get('title')
+        category_id = request.args.get('category_id', type=int)
+        min_price   = request.args.get('min_price',   type=float)
+        max_price   = request.args.get('max_price',   type=float)
+        status      = request.args.get('status')      # open/closed
+
+        # apply filters
+        if title:
+            q = q.filter(Item.title.ilike(f'%{title}%'))
+        if category_id:
+            q = q.filter(Item.category_id == category_id)
+        if min_price is not None:
+            q = q.filter(Auction.init_price >= min_price)
+        if max_price is not None:
+            q = q.filter(Auction.init_price <= max_price)
+        if status in ('open','closed'):
+            q = q.filter(Auction.status == status)
+
+        # fetch & serialize
+        results = q.all()
+        return jsonify([{
+            'auction_id': a.id,
+            'item_id':    a.item_id,
+            'title':      a.item.title,
+            'init_price': a.init_price,
+            'status':     a.status
+        } for a in results]), 200
     
     @app.route('/auctions/<int:auc_id>', methods=['GET'])
     def get_auction(auc_id):
         a = Auction.query.get_or_404(auc_id)
-    
-        # pull all bids for this auction, highest‐first
         bids = Bid.query.filter_by(auction_id=auc_id)\
                         .order_by(Bid.amount.desc()).all()
         bid_list = [{
@@ -275,34 +331,25 @@ def create_app():
             'max_bid':   b.max_bid,
             'timestamp': b.timestamp.isoformat()
         } for b in bids]
-    
-        # compute current high bid (or init_price if none)
-        current_high = bids[0].amount if bids else a.init_price
-    
-        # build response
+        high = bids[0].amount if bids else a.init_price
+
         resp = {
-            'id':            a.id,
-            'item_id':       a.item_id,
-            'seller_id':     a.seller_id,
-            'start_time':    a.start_time.isoformat(),
-            'end_time':      a.end_time.isoformat(),
-            'init_price':    a.init_price,
-            'increment':     a.increment,
-            'reserve_price': a.reserve_price,
-            'status':        a.status,
-            'current_high':  current_high,
-            'bids':          bid_list
+            'id':           a.id,
+            'item_id':      a.item_id,
+            'seller_id':    a.seller_id,
+            'start_time':   a.start_time.isoformat(),
+            'end_time':     a.end_time.isoformat(),
+            'init_price':   a.init_price,
+            'increment':    a.increment,
+            'reserve_price':a.reserve_price,
+            'status':       a.status,
+            'current_high': high,
+            'bids':         bid_list,
+            # ← NEW ↓↓↓
+            'winner':       a.winner.username if a.winner else None,
+            'winning_bid':  a.winning_bid,
+            # ↑↑↑
         }
-    
-        # if auction closed, also include winner & winning_bid
-        if a.status == 'closed':
-            if bids:
-                resp['winner']      = bids[0].bidder
-                resp['winning_bid'] = bids[0].amount
-            else:
-                resp['winner']      = None
-                resp['winning_bid'] = None
-    
         return jsonify(resp), 200
     
      # -------------- (keep your existing routes) ----------------
@@ -701,6 +748,8 @@ def create_app():
         # Neither amount nor max_bid supplied
         return jsonify(error="Either 'amount' or 'max_bid' is required"), 400
    
+
+    
     # Manual trigger for testing alerts
     @app.route("/run_alerts", methods=["POST"])
     def run_alerts():
@@ -711,14 +760,57 @@ def create_app():
         process_alerts()
         return "Alerts processed", 200
 
-    @app.route("/run_close", methods=["POST"])
-    def run_close():
+
+    @app.route('/alerts/<string:username>/matches', methods=['GET'])
+    def alert_matches(username):
         """
-        Manually invoke close_auctions() so you can test closing of expired auctions immediately.
+        GET /alerts/<username>/matches
+        Returns, for each alert, the list of items matching its criteria.
         """
-        from app.tasks import close_auctions
-        close_auctions()
-        return "Auctions closed", 200
+        alerts = Alert.query.filter_by(username=username).all()
+        results = []
+        for a in alerts:
+            crit = a.criteria_json or {}
+            q = Item.query
+            for field, val in crit.items():
+                if hasattr(Item, field):
+                    q = q.filter(getattr(Item, field) == val)
+            items = q.all()
+            results.append({
+                'alert_id':   a.id,
+                'criteria':   crit,
+                'matches':    [i.to_dict() for i in items]
+            })
+        return jsonify(results), 200    
+
+    @app.route("/auctions/<int:auction_id>/close", methods=["POST"])
+    def close_single_auction(auction_id):
+        a = Auction.query.get_or_404(auction_id)
+        if a.status == "closed":
+            return jsonify(message=f"Auction {auction_id} already closed"), 200
+
+        # 1) mark closed
+        a.status = "closed"
+
+        # 2) find top bid
+        top = (
+            Bid.query
+               .filter_by(auction_id=auction_id)
+               .order_by(Bid.amount.desc())
+               .first()
+        )
+        # 3) if meets reserve, record it
+        if top and top.amount >= a.reserve_price:
+            a.winning_bid = top.amount
+            winner = User.query.filter_by(username=top.bidder).first()
+            a.winner_id   = winner.id if winner else None
+
+        db.session.commit()
+        return jsonify(
+            message     = f"Auction {auction_id} closed",
+            winner_id   = a.winner_id,
+            winning_bid = a.winning_bid
+        ), 200   
 
     @app.route("/users/<string:username>", methods=["POST"])
     def create_user(username):
@@ -728,6 +820,20 @@ def create_app():
         db.session.add(u); db.session.commit()
         return jsonify(username=u.username), 201
 
+    
+    @app.route('/auth/delete', methods=['DELETE'])
+    @login_required
+    def auth_delete():
+        """Delete the currently logged-in user and all their data."""
+        # grab the real User object before logout
+        user = current_user._get_current_object()
+        username = user.username
+        # first log them out
+        logout_user()
+        # now delete the mapped User instance
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify(message=f"User {username!r} and all their data have been deleted"), 200
     
     # Update a category (only logged-in users)
     @app.route('/categories/<int:cat_id>', methods=['PUT'])

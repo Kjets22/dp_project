@@ -2,7 +2,7 @@
 
 from flask import Flask, jsonify, redirect, request
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_apscheduler import APScheduler
 
@@ -524,6 +524,47 @@ def create_app():
             winner_id   = a.winner_id,
             winning_bid = a.winning_bid
         ), 200   
+
+
+    @app.route('/auctions/<int:auc_id>/similar', methods=['GET'])
+    def similar_auctions(auc_id):
+        """
+        Return auctions on similar items (same category) in the last 30 days,
+        excluding auction `auc_id` itself.
+        """
+        # 1) Look up the target auction (404 if not found)
+        a = Auction.query.get_or_404(auc_id)
+    
+        # 2) Determine cutoff (30 days ago)
+        cutoff = datetime.utcnow() - timedelta(days=30)
+    
+        # 3) Query for other auctions in same category
+        sims = (
+            db.session.query(Auction)
+              .join(Item)
+              .filter(
+                  Auction.id != auc_id,
+                  Item.category_id == a.item.category_id,
+                  Auction.start_time >= cutoff
+              )
+              .order_by(Auction.start_time.desc())
+              .all()
+        )
+    
+        # 4) Build JSON response
+        out = []
+        for s in sims:
+            out.append({
+                'auction_id':   s.id,
+                'item_id':      s.item_id,
+                'title':        s.item.title,
+                'description':  s.item.description,
+                'start_time':   s.start_time.isoformat(),
+                'end_time':     s.end_time.isoformat(),
+                'init_price':   s.init_price,
+                'status':       s.status
+            })
+        return jsonify(out), 200
 
     @app.route("/users/<string:username>", methods=["POST"])
     def create_user(username):

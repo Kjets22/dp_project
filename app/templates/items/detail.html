@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+`{% extends 'base.html' %}
 {% block title %}Item: {{ item.title }}{% endblock %}
 
 {% block content %}
@@ -17,10 +17,13 @@
     <ul class="list-group">
       {% for auc in item.auctions %}
         <li class="list-group-item d-flex justify-content-between">
-          Auction #{{ auc.id }} —
-          ends {{ auc.end_time.strftime('%b %-d, %Y %H:%M') }} —
-          status: {{ auc.status }}
-          <a href="{{ url_for('auction_detail', auc_id=auc.id) }}" class="btn btn-sm btn-outline-secondary">
+          <div>
+            Auction #{{ auc.id }} —
+            ends {{ auc.end_time.strftime('%b %-d, %Y %H:%M') }} —
+            status: {{ auc.status }}
+          </div>
+          <a href="{{ url_for('auction_detail', auc_id=auc.id) }}"
+             class="btn btn-sm btn-outline-secondary">
             View
           </a>
         </li>
@@ -30,7 +33,8 @@
     <p class="text-muted mt-4">No auctions opened for this item yet.</p>
   {% endif %}
 
-  <a href="{{ url_for('user_detail', id=current_user.id) }}" class="btn btn-link mt-4">
+  <a href="{{ url_for('user_detail', id=current_user.id) }}"
+     class="btn btn-link mt-4">
     ← Back to My Page
   </a>
 </div>

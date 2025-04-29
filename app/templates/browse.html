@@ -8,7 +8,6 @@
 
   <form method="get" action="{{ url_for('browse') }}" class="mb-4">
     <div class="form-row align-items-center">
-      <!-- Search text: now 9 columns -->
       <div class="col-md-9 mb-2">
         <input
           type="text"
@@ -18,27 +17,19 @@
           value="{{ q }}"
         >
       </div>
-
-      <!-- Category filter: now just 2 columns -->
       <div class="col-md-2 mb-2">
         <select name="category_id" class="form-control">
           <option value="">All categories</option>
           {% for cat in categories %}
-            <option
-              value="{{ cat.id }}"
-              {% if cat.id == selected_category %}selected{% endif %}
-            >
+            <option value="{{ cat.id }}"
+              {% if cat.id == selected_category %}selected{% endif %}>
               {{ cat.name }}
             </option>
           {% endfor %}
         </select>
       </div>
-
-      <!-- Submit: 1 column -->
       <div class="col-md-1 mb-2">
-        <button class="btn btn-outline-secondary btn-block" type="submit">
-          Go
-        </button>
+        <button class="btn btn-outline-secondary btn-block" type="submit">Go</button>
       </div>
     </div>
   </form>
@@ -58,23 +49,45 @@
                   {{ item.title }}
                 </a>
               </h5>
-              {% set open_auction = item.auctions 
-                   | selectattr('status','equalto','open') 
-                   | first %}
+
+              {# Find any open or closed auction #}
+              {% set open_auction   = item.auctions
+                                      | selectattr('status','equalto','open')
+                                      | first %}
+              {% set closed_auction = item.auctions
+                                      | selectattr('status','equalto','closed')
+                                      | first %}
+
               {% if open_auction %}
+                {# Open: show current high bid #}
                 {% if open_auction.bids %}
-                  {% set highest_bid = open_auction.bids 
-                       | map(attribute='amount') 
-                       | max %}
+                  {% set highest_bid = open_auction.bids
+                                         | map(attribute='amount')
+                                         | max %}
                 {% else %}
                   {% set highest_bid = open_auction.init_price %}
                 {% endif %}
-                <small class="text-muted">
-                  Current Price: ${{ '%.2f' % highest_bid }}
+                <small class="text-success">
+                  Open — Current Price: ${{ '%.2f' % highest_bid }}
                 </small>
+
+              {% elif closed_auction %}
+                {# Closed: check against reserve #}
+                {% if closed_auction.winning_bid is not none
+                      and closed_auction.winning_bid >= closed_auction.reserve_price %}
+                  <small class="text-muted">
+                    Closed — Sold for ${{ '%.2f' % closed_auction.winning_bid }}
+                  </small>
+                {% else %}
+                  <small class="text-warning">
+                    Closed — Reserve Not Met
+                  </small>
+                {% endif %}
+
               {% else %}
+                {# No auction at all #}
                 <small class="text-muted">
-                  Not opened for auction
+                  Not up for auction
                 </small>
               {% endif %}
             </div>

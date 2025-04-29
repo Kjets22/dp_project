@@ -967,7 +967,28 @@ def create_app():
     @app.route("/items/<int:item_id>", methods=["GET"])
     @login_required
     def item_detail(item_id):
+        # 1) load the item (and its auctions)
         item = Item.query.get_or_404(item_id)
+
+        # 2) auto-close any expired auctions on this item
+        now = datetime.now()
+        for auc in item.auctions:
+            if auc.status == 'open' and now >= auc.end_time:
+                # find the top bid
+                top = (Bid.query
+                        .filter_by(auction_id=auc.id)
+                        .order_by(Bid.amount.desc())
+                        .first())
+                if top and top.amount >= auc.reserve_price:
+                    winner = User.query.filter_by(username=top.bidder).first()
+                    auc.winner_id   = winner.id if winner else None
+                    auc.winning_bid = top.amount
+                else:
+                    auc.winning_bid = top.amount if top else None
+                auc.status = 'closed'
+        db.session.commit()
+
+        # 3) render the template (status on each auc is now up-to-date)
         return render_template("items/detail.html", item=item)
     # @app.route('/items', methods=['GET'])
     # def create_item_form():
@@ -1031,8 +1052,28 @@ def create_app():
 
     @app.route("/")
     def home():
-        # fetch all items, newest first
-        from app.models import Item
+        # 0) Auto-close any expired auctions
+        now = datetime.now()
+        expired = Auction.query.filter(
+            Auction.status == 'open',
+            Auction.end_time <= now
+        ).all()
+        for auc in expired:
+            top = (Bid.query
+                    .filter_by(auction_id=auc.id)
+                    .order_by(Bid.amount.desc())
+                    .first())
+            if top and top.amount >= auc.reserve_price:
+                usr = User.query.filter_by(username=top.bidder).first()
+                auc.winner_id   = usr.id if usr else None
+                auc.winning_bid = top.amount
+            else:
+                auc.winning_bid = top.amount if top else None
+            auc.status = 'closed'
+        if expired:
+            db.session.commit()
+
+        # 1) Load all items
         items = Item.query.order_by(Item.id.desc()).all()
         return render_template("index.html", items=items)
 

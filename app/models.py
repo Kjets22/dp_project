@@ -10,10 +10,19 @@ class User(UserMixin, db.Model):
     username       = db.Column(db.String(64), unique=True, nullable=False)
     password_hash  = db.Column(db.String(128), nullable=False)
     
+    
     auctions = db.relationship(
-        'Auction', back_populates='seller',
+        'Auction',
+        back_populates='seller',
+        cascade='all, delete-orphan',
+        foreign_keys='Auction.seller_id'
+    )
+    # when a User is deleted, also delete everything they own:
+    items = db.relationship(
+        'Item',
+        back_populates='owner',
         cascade='all, delete-orphan'
-    )    
+    )
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -58,7 +67,10 @@ class Item(db.Model):
         'Auction', back_populates='item',
         cascade='all, delete-orphan'
     )
-    owner       = db.relationship('User', backref='items')     
+    owner       = db.relationship(
+        'User',
+        back_populates='items'
+    ) 
     
     def to_dict(self):
         return {
@@ -81,10 +93,24 @@ class Auction(db.Model):
     increment     = db.Column(db.Float, nullable=False)
     reserve_price = db.Column(db.Float, nullable=False)
     status        = db.Column(db.String(10), default='open', nullable=False)
+    winner_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    winning_bid   = db.Column(db.Float, nullable=True)
+    winner        = db.relationship('User', foreign_keys=[winner_id])
+    # relationships
 
     # relationships
-    seller = db.relationship('User', back_populates='auctions')
+    seller = db.relationship(
+        'User',
+        back_populates='auctions',
+        foreign_keys=[seller_id]
+    )
     item   = db.relationship('Item', back_populates='auctions')
+    # cascade bids when auction goes away
+    bids   = db.relationship(
+        'Bid',
+        back_populates='auction',
+        cascade='all, delete-orphan'
+    )
 
     def __repr__(self):
         return (f"<Auction #{self.id} item={self.item_id} "
@@ -99,7 +125,11 @@ class Bid(db.Model):
     timestamp   = db.Column(db.DateTime, default=datetime.utcnow)
 
     # relationship back to Auction so you can do auction.bids
-    auction     = db.relationship('Auction', backref='bids')
+
+    auction     = db.relationship(
+        'Auction',
+        back_populates='bids'
+    )
 
     def __repr__(self):
         return f"<Bid {self.amount} by {self.bidder} on auction {self.auction_id}>"

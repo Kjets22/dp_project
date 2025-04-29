@@ -1079,16 +1079,20 @@ def create_app():
 
     @app.route('/browse', methods=['GET'])
     def browse():
+        # pull query-params
         q            = request.args.get('q', '').strip()
         category_id  = request.args.get('category_id', type=int)
+        min_price    = request.args.get('min_price',   type=float)
+        max_price    = request.args.get('max_price',   type=float)
+        status       = request.args.get('status')  # 'open', 'closed', or None
 
-        # always start from the Item→Auction join so we can show auction info
+        # start from Item → Auction (left join so we still see items without auctions)
         query = (
             Item.query
-                .outerjoin(Auction, (Auction.item_id == Item.id) & (Auction.status == 'open'))
+                .outerjoin(Auction, Auction.item_id == Item.id)
         )
 
-        # text search
+        # text search on Item
         if q:
             query = query.filter(or_(
                 Item.title.ilike(f'%{q}%'),
@@ -1099,14 +1103,25 @@ def create_app():
         if category_id:
             query = query.filter(Item.category_id == category_id)
 
-        # finally, pull all matching items (or *all* if no filters)
-        items = query.order_by(Item.id.desc()).all()
+        # auction‐level filters
+        if min_price is not None:
+            query = query.filter(Auction.init_price >= min_price)
+        if max_price is not None:
+            query = query.filter(Auction.init_price <= max_price)
+        if status in ('open', 'closed'):
+            query = query.filter(Auction.status == status)
 
+        # finally, fetch and render
+        items = query.order_by(Item.id.desc()).all()
         return render_template(
             'browse.html',
             items=items,
+            # pass back all the filter values so the form can re-populate
             q=q,
             categories=Category.query.order_by(Category.name).all(),
-            selected_category=category_id
+            selected_category=category_id,
+            min_price=min_price,
+            max_price=max_price,
+            selected_status=status
         )
     return app

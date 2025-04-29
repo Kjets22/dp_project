@@ -7,8 +7,9 @@
   <h3>Browse Items</h3>
 
   <form method="get" action="{{ url_for('browse') }}" class="mb-4">
-    <div class="form-row align-items-center">
-      <div class="col-md-9 mb-2">
+    <div class="form-row">
+      <!-- Search text -->
+      <div class="col-md-3 mb-2">
         <input
           type="text"
           name="q"
@@ -17,24 +18,60 @@
           value="{{ q }}"
         >
       </div>
+
+      <!-- Category -->
       <div class="col-md-2 mb-2">
         <select name="category_id" class="form-control">
-          <option value="">All categories</option>
+          <option value="" {% if not selected_category %}selected{% endif %}>All categories</option>
           {% for cat in categories %}
-            <option value="{{ cat.id }}"
-              {% if cat.id == selected_category %}selected{% endif %}>
+            <option value="{{ cat.id }}" {% if cat.id == selected_category %}selected{% endif %}>
               {{ cat.name }}
             </option>
           {% endfor %}
         </select>
       </div>
+
+      <!-- Min price -->
+      <div class="col-md-2 mb-2">
+        <input
+          type="number"
+          step="0.01"
+          name="min_price"
+          class="form-control"
+          placeholder="Min price"
+          value="{{ min_price if min_price is not none }}"
+        >
+      </div>
+
+      <!-- Max price -->
+      <div class="col-md-2 mb-2">
+        <input
+          type="number"
+          step="0.01"
+          name="max_price"
+          class="form-control"
+          placeholder="Max price"
+          value="{{ max_price if max_price is not none }}"
+        >
+      </div>
+
+      <!-- Status -->
+      <div class="col-md-2 mb-2">
+        <select name="status" class="form-control">
+          <option value="" {% if not selected_status %}selected{% endif %}>All statuses</option>
+          <option value="open"   {% if selected_status=='open'   %}selected{% endif %}>Open</option>
+          <option value="closed" {% if selected_status=='closed' %}selected{% endif %}>Closed</option>
+        </select>
+      </div>
+
+      <!-- Unified button -->
       <div class="col-md-1 mb-2">
-        <button class="btn btn-outline-secondary btn-block" type="submit">Go</button>
+        <button class="btn btn-primary btn-block" type="submit">Search</button>
       </div>
     </div>
   </form>
 
-  {% if not items and (q or selected_category) %}
+  {% if not items and (q or selected_category or min_price or max_price or selected_status) %}
     <p class="text-muted">No items match those criteria.</p>
   {% endif %}
 
@@ -50,7 +87,7 @@
                 </a>
               </h5>
 
-              {# Find any open or closed auction #}
+              {# determine open / closed / none auctions #}
               {% set open_auction   = item.auctions
                                       | selectattr('status','equalto','open')
                                       | first %}
@@ -58,38 +95,37 @@
                                       | selectattr('status','equalto','closed')
                                       | first %}
 
-              {% if open_auction %}
-                {# Open: show current high bid #}
-                {% if open_auction.bids %}
-                  {% set highest_bid = open_auction.bids
-                                         | map(attribute='amount')
-                                         | max %}
-                {% else %}
-                  {% set highest_bid = open_auction.init_price %}
-                {% endif %}
-                <small class="text-success">
-                  Open — Current Price: ${{ '%.2f' % highest_bid }}
-                </small>
+              <div class="mt-auto">
+                {% if open_auction %}
+                  {% if open_auction.bids %}
+                    {% set highest = open_auction.bids
+                                      | map(attribute='amount')
+                                      | max %}
+                  {% else %}
+                    {% set highest = open_auction.init_price %}
+                  {% endif %}
+                  <small class="text-success">
+                    Open — ${{ '%.2f' % highest }}
+                  </small>
 
-              {% elif closed_auction %}
-                {# Closed: check against reserve #}
-                {% if closed_auction.winning_bid is not none
-                      and closed_auction.winning_bid >= closed_auction.reserve_price %}
+                {% elif closed_auction %}
+                  {% if closed_auction.winning_bid is not none
+                        and closed_auction.winning_bid >= closed_auction.reserve_price %}
+                    <small class="text-muted">
+                      Closed — Sold ${{ '%.2f' % closed_auction.winning_bid }}
+                    </small>
+                  {% else %}
+                    <small class="text-warning">
+                      Closed — Reserve Not Met
+                    </small>
+                  {% endif %}
+
+                {% else %}
                   <small class="text-muted">
-                    Closed — Sold for ${{ '%.2f' % closed_auction.winning_bid }}
-                  </small>
-                {% else %}
-                  <small class="text-warning">
-                    Closed — Reserve Not Met
+                    Not up for auction
                   </small>
                 {% endif %}
-
-              {% else %}
-                {# No auction at all #}
-                <small class="text-muted">
-                  Not up for auction
-                </small>
-              {% endif %}
+              </div>
             </div>
           </div>
         </div>

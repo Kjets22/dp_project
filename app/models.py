@@ -82,6 +82,7 @@ class Auction(db.Model):
     increment     = db.Column(db.Float, nullable=False)
     reserve_price = db.Column(db.Float, nullable=False)
     status        = db.Column(db.String(10), default='open', nullable=False)
+    winning_id    = db.Column(db.Integer, default='open', nullable=True)
 
     # relationships
     seller = db.relationship('User', back_populates='auctions')

@@ -114,72 +114,132 @@ def create_app():
     #     return jsonify(id=a.id), 201
     
     
-    @app.route("/auctions/<int:auc_id>/detail", methods=["GET","POST"])
+    @app.route("/auctions/<int:auc_id>/detail", methods=["GET", "POST"])
     @login_required
     def auction_detail(auc_id):
         auction = Auction.query.get_or_404(auc_id)
         item    = auction.item
 
-        # 1) compute current price & highest‐bidder
-        highest_bid_record = (
-            Bid.query
-            .filter_by(auction_id=auc_id)
-            .order_by(Bid.amount.desc())
-            .first()
-        )
-        if highest_bid_record:
-            current_price  = highest_bid_record.amount
-            highest_bidder = highest_bid_record.bidder
+        def get_top_bid():
+            return (Bid.query
+                    .filter_by(auction_id=auc_id)
+                    .order_by(Bid.amount.desc())
+                    .first())
+
+        # ── Fetch current top bid ────────────────────────────────────────────
+        top = get_top_bid()
+        if top:
+            current_price  = top.amount
+            highest_bidder = top.bidder
         else:
             current_price  = auction.init_price
             highest_bidder = None
 
-        # 2) process new‐bid POST
         if request.method == "POST":
-            # a) owner can’t bid on own auction
+            # ── 1) Validation ──────────────────────────────────────────
             if current_user.id == auction.seller_id:
+                flash("You cannot bid on your own auction.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
-            # b) highest bidder can’t outbid themself
             if highest_bidder == current_user.username:
-                return redirect(url_for("auction_detail", auc_id=auc_id))
-
-            # c) parse & validate amount
-            try:
-                new_amount = float(request.form["bid_amount"])
-            except (KeyError, ValueError):
+                flash("You’re already the highest bidder.", "warning")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
             required_min = current_price + auction.increment
-            if new_amount < required_min:
-                return redirect(url_for("auction_detail", auc_id=auc_id))
+            max_raw      = request.form.get("max_bid",   "").strip()
+            amt_raw      = request.form.get("bid_amount","").strip()
 
-            # d) record the bid
-            b = Bid(
+            # ── 2) Build the user’s Bid (always with a ceiling) ───────
+            if max_raw:
+                try:
+                    ceiling = float(max_raw)
+                except ValueError:
+                    flash("Invalid max bid value.", "danger")
+                    return redirect(url_for("auction_detail", auc_id=auc_id))
+                if ceiling < required_min:
+                    flash(f"Your max bid must be ≥ {required_min:.2f}.", "danger")
+                    return redirect(url_for("auction_detail", auc_id=auc_id))
+                bid_amt = min(ceiling, required_min)
+            else:
+                try:
+                    bid_amt = float(amt_raw)
+                except ValueError:
+                    flash("Please enter a valid bid amount.", "danger")
+                    return redirect(url_for("auction_detail", auc_id=auc_id))
+                if bid_amt < required_min:
+                    flash(f"Your bid must be at least {required_min:.2f}.", "danger")
+                    return redirect(url_for("auction_detail", auc_id=auc_id))
+                ceiling = bid_amt
+
+            user_bid = Bid(
                 auction_id=auc_id,
-                bidder=     current_user.username,
-                amount=     new_amount
+                bidder=current_user.username,
+                amount=bid_amt,
+                max_bid=ceiling
             )
-            db.session.add(b)
+            db.session.add(user_bid)
             db.session.commit()
+            flash("Your bid was placed!", "success")
+
+            # ── 3) Gather every bidder’s ceiling ───────────────────────
+            proxies = {}
+            for b in Bid.query.filter_by(auction_id=auc_id):
+                if b.max_bid is not None:
+                    proxies[b.bidder] = max(proxies.get(b.bidder, 0), b.max_bid)
+
+            # ── 4) Loop auto‐bidding back and forth between the top two ceilings ──
+            while True:
+                # need two bidders to interleave
+                if len(proxies) < 2:
+                    break
+
+                top = get_top_bid()
+                current_price  = top.amount
+                current_winner = top.bidder
+
+                # pick top two ceilings
+                sorted_proxies = sorted(proxies.items(), key=lambda kv: kv[1], reverse=True)
+                (user1, max1), (user2, max2) = sorted_proxies[0], sorted_proxies[1]
+
+                # next bidder is the one who isn't currently winning
+                if current_winner == user1:
+                    next_bidder, next_max = user2, max2
+                else:
+                    next_bidder, next_max = user1, max1
+
+                next_price = current_price + auction.increment
+
+                # stop if ceiling too low
+                if next_price > next_max:
+                    break
+
+                auto = Bid(
+                    auction_id=auc_id,
+                    bidder=    next_bidder,
+                    amount=    next_price,
+                    max_bid=   next_max
+                )
+                db.session.add(auto)
+                db.session.commit()
+                flash(f"Auto-bid: {next_bidder} → {next_price:.2f}", "info")
+
             return redirect(url_for("auction_detail", auc_id=auc_id))
 
-        # 3) GET → render
-        bids = (
-            Bid.query
-            .filter_by(auction_id=auc_id)
-            .order_by(Bid.timestamp.desc())
-            .all()
-        )
+        # ── GET → render page ─────────────────────────────────────────────
+        bids = (Bid.query
+                .filter_by(auction_id=auc_id)
+                .order_by(Bid.timestamp.desc())
+                .all())
+
         return render_template(
             "auctions/detail.html",
-            auction=auction,
-            item=item,
-            bids=bids,
-            current_price=current_price,
-            highest_bidder=highest_bidder
+            auction=        auction,
+            item=           item,
+            bids=           bids,
+            current_price=  current_price,
+            highest_bidder= highest_bidder
         )
-    
+
     @app.route('/auctions', methods=['GET'])
     def list_auctions():
         status = request.args.get('status')
@@ -310,37 +370,6 @@ def create_app():
     class SchedulerConfig:
         SCHEDULER_API_ENABLED = True
         # add any other APScheduler settings here
-    
-    def create_app():
-        app = Flask(__name__)
-        app.config.from_object("config.Config")
-        app.config.from_object(SchedulerConfig)
-    
-        # … your existing init_app, db.create_all(), login, routes, etc.
-    
-        # ↓↓↓ add this block at the bottom of create_app() before `return app` ↓↓↓
-        scheduler = APScheduler()
-        scheduler.init_app(app)
-        scheduler.start()
-    
-        # Close auctions every minute
-        scheduler.add_job(
-            id='close_auctions',
-            func=close_auctions,
-            trigger='interval',
-            minutes=1
-        )
-    
-        # Process alerts every 5 minutes
-        scheduler.add_job(
-            id='process_alerts',
-            func=process_alerts,
-            trigger='interval',
-            minutes=5
-        )
-        # ↑↑↑ end scheduler block ↑↑↑
-    
-        return app
     
     # ------------------------------
     # Participation & Bidder History

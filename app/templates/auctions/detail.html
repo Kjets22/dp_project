@@ -16,60 +16,56 @@
   <hr>
   <p>
     <strong>Current Price:</strong> {{ current_price }}<br>
-    <strong>Increment:</strong> {{ auction.increment }}
+    <strong>Increment:</strong> {{ auction.increment }}<br>
+    <strong>Leading Bidder:</strong> {{ highest_bidder or "—" }}<br>
+    <strong>Winner ID:</strong> {{ auction.winning_id or "—" }}
   </p>
 
-  {# only show bidding UI when open #}
   {% if auction.status == 'open' %}
-    {# 1) seller blocked #}
     {% if current_user.id == auction.seller_id %}
-      <div class="alert alert-warning">
-        You’re the seller — you cannot bid here.
-      </div>
+      <div class="alert alert-warning">You’re the seller &mdash; you cannot bid here.</div>
 
-    {# 2) highest bidder blocked #}
     {% elif highest_bidder == current_user.username %}
-      <div class="alert alert-info">
-        You’re currently the highest bidder.
-      </div>
+      <div class="alert alert-info">You’re currently the highest bidder.</div>
 
-    {# 3) otherwise, show the form #}
     {% else %}
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="card-title">Place a New Bid</h5>
+          <h5 class="card-title">Place a Bid</h5>
           <form method="post">
             <div class="form-group">
-              <label for="bid_amount">
-                Your Bid
-                (min {{ (current_price + auction.increment)|round(2) }})
-              </label>
+              <label>Your Maximum Bid <small class="text-muted">(optional)</small></label>
+              <input
+                type="number"
+                step="0.01"
+                name="max_bid"
+                class="form-control"
+                placeholder="e.g. 100.00"
+                min="{{ current_price + auction.increment }}"
+              >
+            </div>
+            <div class="form-group">
+              <label>Your Exact Next Bid <small class="text-muted">(optional)</small></label>
               <input
                 type="number"
                 step="0.01"
                 name="bid_amount"
-                id="bid_amount"
                 class="form-control"
-                required
+                placeholder="{{ (current_price + auction.increment)|round(2) }}"
                 min="{{ (current_price + auction.increment)|round(2) }}"
-                value="{{ (current_price + auction.increment)|round(2) }}"
               >
             </div>
-            <button type="submit" class="btn btn-primary">
-              Submit Bid
-            </button>
+            <button type="submit" class="btn btn-primary">Place Bid</button>
           </form>
         </div>
       </div>
     {% endif %}
   {% else %}
-    <div class="alert alert-secondary">
-      This auction is closed.
-    </div>
+    <div class="alert alert-secondary">This auction is closed.</div>
   {% endif %}
 
   <hr>
-  <h4>Bids</h4>
+  <h4>Bid History</h4>
   {% if bids %}
     <ul class="list-group mb-4">
       {% for bid in bids %}

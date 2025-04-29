@@ -1,87 +1,78 @@
+{# templates/auctions/detail.html #}
 {% extends 'base.html' %}
 {% block title %}Auction #{{ auction.id }}{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for cat,msg in messages %}
-        <div class="alert alert-{{ cat }}">{{ msg }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+  {% for cat,msg in get_flashed_messages(with_categories=true) %}
+    <div class="alert alert-{{cat}}">{{msg}}</div>
+  {% endfor %}
 
-  <h2>Auction #{{ auction.id }} for “{{ item.title }}”</h2>
-  <p><strong>Description:</strong> {{ item.description or "—" }}</p>
+  <h2>Auction #{{ auction.id }}: “{{ item.title }}”</h2>
+  <p>{{ item.description or "—" }}</p>
   <hr>
   <p>
-    <strong>Current Price:</strong> {{ current_price }}<br>
+    <strong>Current Price:</strong> ${{ current_price }}<br>
     <strong>Increment:</strong> {{ auction.increment }}<br>
-    <strong>Leading Bidder:</strong> {{ highest_bidder or "—" }}<br>
-    <strong>Winner ID:</strong> {{ auction.winning_id or "—" }}
+    <strong>Leader:</strong> {{ highest_bidder or "—" }}<br>
+    <strong>Leader ID:</strong> {{ auction.winning_id or "—" }}<br>
+    <strong>Ends At:</strong> {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}
   </p>
 
   {% if auction.status == 'open' %}
     {% if current_user.id == auction.seller_id %}
-      <div class="alert alert-warning">You’re the seller &mdash; you cannot bid here.</div>
-
+      <div class="alert alert-warning">You’re the seller—you cannot bid.</div>
     {% elif highest_bidder == current_user.username %}
-      <div class="alert alert-info">You’re currently the highest bidder.</div>
-
+      <div class="alert alert-info">You’re currently the leader.</div>
     {% else %}
       <div class="card mb-4">
         <div class="card-body">
-          <h5 class="card-title">Place a Bid</h5>
+          <h5>Place a Bid</h5>
           <form method="post">
             <div class="form-group">
-              <label>Your Maximum Bid <small class="text-muted">(optional)</small></label>
-              <input
-                type="number"
-                step="0.01"
-                name="max_bid"
-                class="form-control"
-                placeholder="e.g. 100.00"
-                min="{{ current_price + auction.increment }}"
-              >
+              <label>Max Bid (proxy, optional)</label>
+              <input type="number" step="0.01" name="max_bid" class="form-control"
+                     min="{{ (current_price+auction.increment)|round(2) }}">
             </div>
             <div class="form-group">
-              <label>Your Exact Next Bid <small class="text-muted">(optional)</small></label>
-              <input
-                type="number"
-                step="0.01"
-                name="bid_amount"
-                class="form-control"
-                placeholder="{{ (current_price + auction.increment)|round(2) }}"
-                min="{{ (current_price + auction.increment)|round(2) }}"
-              >
+              <label>Exact Bid (optional)</label>
+              <input type="number" step="0.01" name="bid_amount" class="form-control"
+                     min="{{ (current_price+auction.increment)|round(2) }}">
             </div>
-            <button type="submit" class="btn btn-primary">Place Bid</button>
+            <button class="btn btn-primary">Place Bid</button>
           </form>
         </div>
       </div>
     {% endif %}
   {% else %}
-    <div class="alert alert-secondary">This auction is closed.</div>
+    <div class="alert alert-secondary">
+      <h4>Auction Closed</h4>
+      {% if auction.winner_id %}
+        <p><strong>Winner:</strong> {{ auction.winner.username }}<br>
+           <strong>Winning Bid:</strong> ${{ auction.winning_bid }}</p>
+      {% else %}
+        <p><strong>Broken:</strong> Reserve ${{ auction.reserve_price }} not met.<br>
+           Highest bid: ${{ auction.winning_bid or '—' }}</p>
+      {% endif %}
+    </div>
   {% endif %}
 
   <hr>
   <h4>Bid History</h4>
   {% if bids %}
     <ul class="list-group mb-4">
-      {% for bid in bids %}
+      {% for b in bids %}
         <li class="list-group-item d-flex justify-content-between">
-          <span><strong>{{ bid.bidder }}</strong> bid {{ bid.amount }}</span>
-          <small class="text-muted">{{ bid.timestamp.strftime('%b %-d, %Y %H:%M') }}</small>
+          <span><strong>{{b.bidder}}</strong> → ${{b.amount}}</span>
+          <small class="text-muted">{{b.timestamp.strftime('%b %-d, %Y %H:%M')}}</small>
         </li>
       {% endfor %}
     </ul>
   {% else %}
-    <p class="text-muted">No bids have been placed yet.</p>
+    <p class="text-muted">No bids yet.</p>
   {% endif %}
 
   <a href="{{ url_for('user_detail', id=current_user.id) }}"
-     class="btn btn-outline-secondary">
-    ← Back to My Page
-  </a>
+     class="btn btn-outline-secondary">← Back to My Page</a>
 </div>
 {% endblock %}

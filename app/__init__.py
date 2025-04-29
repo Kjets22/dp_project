@@ -10,7 +10,7 @@ from werkzeug.security import check_password_hash
 db = SQLAlchemy()
 login = LoginManager()
 login.login_view = 'auth_login'
-
+sched = APScheduler()
 def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
@@ -24,41 +24,54 @@ def create_app():
     
     login.init_app(app)
 
+    sched.init_app(app)
+    sched.start()   
     @login.user_loader
     def load_user(user_id):
         from app.models import User
         return User.query.get(int(user_id))   
 
     
-
+    @sched.task('interval', id='close_auctions', seconds=60, misfire_grace_time=120)
+    def close_expired_auctions():
+        now = datetime.utcnow()
+        expired = Auction.query.filter(
+            Auction.status=='open',
+            Auction.end_time <= now
+        ).all()
+        for a in expired:
+            top = (Bid.query
+                      .filter_by(auction_id=a.id)
+                      .order_by(Bid.amount.desc())
+                      .first())
+            if top and top.amount >= a.reserve_price:
+                usr = User.query.filter_by(username=top.bidder).first()
+                a.winner_id   = usr.id if usr else None
+                a.winning_bid = top.amount
+            else:
+                a.winning_bid = top.amount if top else None
+            a.status = 'closed'
+        db.session.commit()
 
     # --------------- Auction Endpoints ----------------
     @app.route("/auctions/open/<int:item_id>", methods=["GET","POST"])
     @login_required
     def open_auction(item_id):
-        # 1) Grab the item, ensuring it belongs to current_user
         item = Item.query.get_or_404(item_id)
         if item.owner_id != current_user.id:
             return redirect(url_for("user_detail", id=current_user.id))
 
-        # 2) On POST, read the form and create Auction
         if request.method == "POST":
             end_time_str  = request.form.get("end_time","").strip()
-            init_price    = request.form.get("init_price", type=float)
-            increment     = request.form.get("increment", type=float)
+            init_price    = request.form.get("init_price",    type=float)
+            increment     = request.form.get("increment",     type=float)
             reserve_price = request.form.get("reserve_price", type=float)
 
-            # basic validation
             errors = []
-            if not end_time_str:
-                errors.append("End time is required.")
-            if init_price is None:
-                errors.append("Starting price is required.")
-            if increment is None:
-                errors.append("Increment is required.")
-            if reserve_price is None:
-                errors.append("Reserve price is required.")
-            # parse datetime
+            if not end_time_str:   errors.append("End time is required.")
+            if init_price    is None: errors.append("Starting price is required.")
+            if increment     is None: errors.append("Increment is required.")
+            if reserve_price is None: errors.append("Reserve price is required.")
             try:
                 end_time = datetime.fromisoformat(end_time_str)
             except ValueError:
@@ -74,11 +87,14 @@ def create_app():
                     end_time      = end_time,
                     init_price    = init_price,
                     increment     = increment,
-                    reserve_price = reserve_price
+                    reserve_price = reserve_price,
+                    status        = 'open'      # ← explicitly set to open
                 )
                 db.session.add(a)
                 db.session.commit()
                 return redirect(url_for("user_detail", id=current_user.id))
+
+        return render_template("auctions/open.html", item=item)
 
         # 3) On GET (or if validation failed), render the form
         return render_template("auctions/open.html", item=item)
@@ -117,7 +133,7 @@ def create_app():
     #     return jsonify(id=a.id), 201
     
     
-    @app.route("/auctions/<int:auc_id>/detail", methods=["GET", "POST"])
+    @app.route("/auctions/<int:auc_id>/detail", methods=["GET","POST"])
     @login_required
     def auction_detail(auc_id):
         auction = Auction.query.get_or_404(auc_id)
@@ -129,30 +145,50 @@ def create_app():
                     .order_by(Bid.amount.desc())
                     .first())
 
-        # ── Fetch current top bid ────────────────────────────────────────────
+        # 0) Auto‐close if past end_time (use local now, not UTC)
+        if auction.status == 'open' and datetime.now() >= auction.end_time:
+            top = get_top_bid()
+            if top and top.amount >= auction.reserve_price:
+                usr = User.query.filter_by(username=top.bidder).first()
+                auction.winner_id   = usr.id if usr else None
+                auction.winning_bid = top.amount
+            else:
+                auction.winning_bid = top.amount if top else None
+            auction.status = 'closed'
+            db.session.commit()
+
+        # 1) Fetch the (possibly new) top bid & update winning_id
         top = get_top_bid()
         if top:
-            current_price  = top.amount
-            highest_bidder = top.bidder
+            current_price   = top.amount
+            highest_bidder  = top.bidder
+            usr_curr        = User.query.filter_by(username=top.bidder).first()
+            auction.winning_id = usr_curr.id if usr_curr else None
         else:
-            current_price  = auction.init_price
-            highest_bidder = None
+            current_price   = auction.init_price
+            highest_bidder  = None
+            auction.winning_id = None
+        db.session.commit()
 
+        # 2) Handle a POST bid
         if request.method == "POST":
-            # ── 1) Validation ──────────────────────────────────────────
+            if auction.status == 'closed':
+                flash("This auction has ended; no more bids allowed.", "warning")
+                return redirect(url_for("auction_detail", auc_id=auc_id))
+
+            # ── Validation ─────────────────────────
             if current_user.id == auction.seller_id:
                 flash("You cannot bid on your own auction.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
-
             if highest_bidder == current_user.username:
                 flash("You’re already the highest bidder.", "warning")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
             required_min = current_price + auction.increment
-            max_raw      = request.form.get("max_bid",   "").strip()
+            max_raw      = request.form.get("max_bid","").strip()
             amt_raw      = request.form.get("bid_amount","").strip()
 
-            # ── 2) Build the user’s Bid (always with a ceiling) ───────
+            # ── Build the user’s bid (with ceiling) ───────
             if max_raw:
                 try:
                     ceiling = float(max_raw)
@@ -176,59 +212,53 @@ def create_app():
 
             user_bid = Bid(
                 auction_id=auc_id,
-                bidder=current_user.username,
-                amount=bid_amt,
-                max_bid=ceiling
+                bidder     = current_user.username,
+                amount     = bid_amt,
+                max_bid    = ceiling
             )
             db.session.add(user_bid)
             db.session.commit()
             flash("Your bid was placed!", "success")
 
-            # ── 3) Gather every bidder’s ceiling ───────────────────────
+            # 3) Collect each bidder’s top ceiling
             proxies = {}
             for b in Bid.query.filter_by(auction_id=auc_id):
                 if b.max_bid is not None:
                     proxies[b.bidder] = max(proxies.get(b.bidder, 0), b.max_bid)
 
-            # ── 4) Loop auto‐bidding back and forth between the top two ceilings ──
-            while True:
-                # need two bidders to interleave
-                if len(proxies) < 2:
-                    break
-
-                top = get_top_bid()
+            # 4) Auto-bid back-and-forth between the top two ceilings
+            while len(proxies) >= 2:
+                top            = get_top_bid()
                 current_price  = top.amount
                 current_winner = top.bidder
 
-                # pick top two ceilings
-                sorted_proxies = sorted(proxies.items(), key=lambda kv: kv[1], reverse=True)
-                (user1, max1), (user2, max2) = sorted_proxies[0], sorted_proxies[1]
-
-                # next bidder is the one who isn't currently winning
-                if current_winner == user1:
-                    next_bidder, next_max = user2, max2
+                (u1,m1),(u2,m2) = sorted(proxies.items(), key=lambda x: x[1], reverse=True)[:2]
+                if current_winner == u1:
+                    nxt, nxt_max = u2, m2
                 else:
-                    next_bidder, next_max = user1, max1
+                    nxt, nxt_max = u1, m1
 
-                next_price = current_price + auction.increment
-
-                # stop if ceiling too low
-                if next_price > next_max:
+                nxt_price = current_price + auction.increment
+                if nxt_price > nxt_max:
                     break
 
                 auto = Bid(
                     auction_id=auc_id,
-                    bidder=    next_bidder,
-                    amount=    next_price,
-                    max_bid=   next_max
+                    bidder    = nxt,
+                    amount    = nxt_price,
+                    max_bid   = nxt_max
                 )
                 db.session.add(auto)
                 db.session.commit()
-                flash(f"Auto-bid: {next_bidder} → {next_price:.2f}", "info")
+                flash(f"Auto-bid: {nxt} → {nxt_price:.2f}", "info")
+
+                usr_next = User.query.filter_by(username=nxt).first()
+                auction.winning_id = usr_next.id if usr_next else None
+                db.session.commit()
 
             return redirect(url_for("auction_detail", auc_id=auc_id))
 
-        # ── GET → render page ─────────────────────────────────────────────
+        # 5) GET → render the page
         bids = (Bid.query
                 .filter_by(auction_id=auc_id)
                 .order_by(Bid.timestamp.desc())
@@ -862,19 +892,19 @@ def create_app():
         return jsonify(username=u.username), 201
 
     
-    @app.route('/auth/delete', methods=['DELETE'])
-    @login_required
-    def auth_delete():
-        """Delete the currently logged-in user and all their data."""
-        # grab the real User object before logout
-        user = current_user._get_current_object()
-        username = user.username
-        # first log them out
-        logout_user()
-        # now delete the mapped User instance
-        db.session.delete(user)
-        db.session.commit()
-        return jsonify(message=f"User {username!r} and all their data have been deleted"), 200
+    # @app.route('/auth/delete', methods=['DELETE'])
+    # @login_required
+    # def auth_delete():
+    #     """Delete the currently logged-in user and all their data."""
+    #     # grab the real User object before logout
+    #     user = current_user._get_current_object()
+    #     username = user.username
+    #     # first log them out
+    #     logout_user()
+    #     # now delete the mapped User instance
+    #     db.session.delete(user)
+    #     db.session.commit()
+    #     return jsonify(message=f"User {username!r} and all their data have been deleted"), 200
     
     # Update a category (only logged-in users)
     @app.route('/categories/<int:cat_id>', methods=['PUT'])

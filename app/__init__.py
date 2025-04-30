@@ -771,13 +771,17 @@ def create_app():
     def auth_register_form():
         return render_template('/auth/register.html')
 
-    @app.route('/auth/register', methods=['POST'])
+    @app.route('/auth/register', methods=['GET','POST'])
     def auth_register():
-        form      = request.form
-        username  = form.get('username', '').strip()
-        password  = form.get('password', '')
-        full_name = form.get('full_name', '').strip()
-        dob_str   = form.get('date_of_birth', '').strip()
+        if request.method == 'GET':
+            return render_template('auth/register.html')
+
+        form = request.form
+        username      = form.get('username', '').strip()
+        password      = form.get('password', '')
+        full_name     = form.get('full_name', '').strip()
+        dob_str       = form.get('date_of_birth', '').strip()
+        email         = form.get('email', '').strip()
 
         errors = []
         if not username:
@@ -788,41 +792,39 @@ def create_app():
             errors.append("Full name is required.")
         if not dob_str:
             errors.append("Date of birth is required.")
+        if not email:
+            errors.append("Email is required.")
 
-        # duplicate‐username check
+        # uniqueness checks
         if username and User.query.filter_by(username=username).first():
             errors.append("That username is already taken.")
+        if email and User.query.filter_by(email=email).first():
+            errors.append("That email is already registered.")
 
         if errors:
             for e in errors:
                 flash(e, "danger")
             return redirect(url_for('auth_register'))
 
-        # parse date_of_birth
+        # parse DOB
         try:
             date_of_birth = datetime.strptime(dob_str, "%Y-%m-%d").date()
         except ValueError:
+            flash("Invalid date of birth format; use YYYY-MM-DD.", "danger")
             return redirect(url_for('auth_register'))
 
-        # create & save the user
+        # create user
         user = User(
             username=username,
+            email=email,
             full_name=full_name,
             date_of_birth=date_of_birth
         )
-        user.set_password(password)     # your model’s hashing method
-        data = request.get_json(force=True)
-        u = data.get('username'); p = data.get('password'); e = data.get('email')
-        # if not u or not p or not e:
-        #     return jsonify(error="username, password and email required"), 400
-        # if User.query.filter_by(username=u).first():
-        #     return jsonify(error="User already exists"), 400
-        # construct with email
-        user = User(username=u, email=e)
-        user.set_password(p)
+        user.set_password(password)
         db.session.add(user)
         db.session.commit()
 
+        flash("Account created successfully! Please log in.", "success")
         return redirect(url_for('auth_login'))
     
     @app.route('/auth/delete', methods=['GET'])
@@ -859,6 +861,14 @@ def create_app():
             return jsonify(error="No username provided"), 400
 
         taken = User.query.filter_by(username=uname).first() is not None
+        return jsonify(available=not taken), 200
+    
+    @app.route("/auth/check_email", methods=["GET"])
+    def check_email():
+        email = request.args.get("email", "").strip()
+        if not email:
+            return jsonify(error="No email provided"), 400
+        taken = User.query.filter_by(email=email).first() is not None
         return jsonify(available=not taken), 200
     
     # @app.route('/auth/login', methods=['GET'])
@@ -1490,17 +1500,30 @@ def create_app():
         data = request.get_json(force=True)
         u = (data.get('username') or "").strip()
         p = (data.get('password') or "").strip()
-        if not u or not p:
-            return jsonify(error="username and password required"), 400
-        if User.query.filter_by(username=u).first():
-            return jsonify(error="User exists"), 400
+        e = (data.get('email')    or "").strip()
 
-        user = User(username=u, is_admin=True)
+        # require all three
+        if not u or not p or not e:
+            return jsonify(error="username, password and email required"), 400
+
+        # uniqueness checks
+        if User.query.filter_by(username=u).first():
+            return jsonify(error="Username already exists"), 400
+        if User.query.filter_by(email=e).first():
+            return jsonify(error="Email already in use"), 400
+
+        # create & save
+        user = User(username=u, email=e, is_admin=True)
         user.set_password(p)
         db.session.add(user)
         db.session.commit()
-        return jsonify(username=user.username, is_admin=user.is_admin), 201
-    
+
+        return jsonify(
+            username=user.username,
+            email=user.email,
+            is_admin=user.is_admin
+        ), 201
+
     @app.route('/admin/<int:id>', methods=['GET'])
     @admin_required
     def admin_detail(id):
@@ -1568,18 +1591,28 @@ def create_app():
         if request.method == 'POST':
             username = request.form.get('username','').strip()
             password = request.form.get('password','').strip()
-            if not username or not password:
-                flash("Both username and password are required.", "danger")
+            email    = request.form.get('email','').strip()
+
+            # basic validation
+            if not username or not password or not email:
+                flash("Username, password and email are all required.", "danger")
                 return redirect(request.url)
+
+            # unique checks
             if User.query.filter_by(username=username).first():
                 flash("That username is already taken.", "danger")
                 return redirect(request.url)
+            if User.query.filter_by(email=email).first():
+                flash("That email is already registered.", "danger")
+                return redirect(request.url)
 
-            rep = User(username=username, is_rep=True)
+            # create rep
+            rep = User(username=username, email=email, is_rep=True)
             rep.set_password(password)
             db.session.add(rep)
             db.session.commit()
-            flash(f"Customer‐rep {username!r} created.", "success")
+
+            flash(f"Customer-rep {username!r} created.", "success")
             return redirect(url_for('admin_detail', id=current_user.id))
 
         return render_template('admin/create.html')

@@ -1,16 +1,36 @@
 # app/__init__.py
 from sqlalchemy import or_
 from flask import Flask, jsonify, redirect, request, render_template, url_for, flash, session
+from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_apscheduler import APScheduler
+from sqlalchemy import func
 from werkzeug.security import check_password_hash
 
 db = SQLAlchemy()
 login = LoginManager()
 login.login_view = 'auth_login'
-sched = APScheduler()
+
+def admin_required(f):
+    @wraps(f)
+    @login_required
+    def decorated(*args, **kwargs):
+        if not current_user.is_admin:
+            return jsonify(error="Forbidden"), 403
+        return f(*args, **kwargs)
+    return decorated
+
+def rep_required(f):
+    @wraps(f)
+    @login_required
+    def decorated(*args, **kwargs):
+        if not (current_user.is_rep or current_user.is_admin):
+            return jsonify(error="Forbidden"), 403
+        return f(*args, **kwargs)
+    return decorated
+    
 def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
@@ -781,6 +801,102 @@ def create_app():
             logout_user()
         return render_template("/auth/logout.html")
 
+    # ── Admin: create customer‐rep accounts ─────────────────────────────────────
+    
+    @app.route('/admin/create_rep', methods=['POST'])
+    @admin_required
+    def create_rep():
+        """
+        Only an admin may call this to spin up a new customer‐rep account.
+        """
+        data = request.get_json(force=True)
+        u = data.get('username'); p = data.get('password')
+        if not u or not p:
+            return jsonify(error="username and password required"), 400
+        if User.query.filter_by(username=u).first():
+            return jsonify(error="User already exists"), 400
+    
+        rep = User(username=u, is_rep=True)
+        rep.set_password(p)
+        db.session.add(rep)
+        db.session.commit()
+        return jsonify(username=rep.username, is_rep=rep.is_rep), 201   
+    
+    # ── Rep (or admin): reset any user’s password ───────────────────────────────
+       
+    # reset any user's password
+    @app.route('/rep/reset_password/<string:username>', methods=['POST'])
+    @rep_required
+    def rep_reset_password(username):
+        data = request.get_json(force=True)
+        new_p = data.get('new_password')
+        if not new_p:
+            return jsonify(error="new_password required"), 400
+        user = User.query.filter_by(username=username).first_or_404()
+        user.set_password(new_p)
+        db.session.commit()
+        return jsonify(message=f"Password for {username} reset"), 200
+    
+    # remove an illegal bid
+    @app.route('/rep/remove_bid/<int:bid_id>', methods=['DELETE'])
+    @rep_required
+    def rep_remove_bid(bid_id):
+        bid = Bid.query.get_or_404(bid_id)
+        db.session.delete(bid)
+        db.session.commit()
+        return jsonify(message=f"Bid {bid_id} removed"), 200
+    
+    # remove an illegal auction
+    @app.route('/rep/remove_auction/<int:auction_id>', methods=['DELETE'])
+    @rep_required
+    def rep_remove_auction(auction_id):
+        auc = Auction.query.get_or_404(auction_id)
+        db.session.delete(auc)
+        db.session.commit()
+        return jsonify(message=f"Auction {auction_id} removed"), 200
+    
+    # ── Admin: sales summary report ──────────────────────────────────────────────
+    @app.route('/admin/reports/sales', methods=['GET'])
+    @admin_required
+    def report_sales():
+        # total earnings across all closed auctions
+        total = db.session.query(func.coalesce(func.sum(Auction.winning_bid), 0.0)).scalar()
+    
+        # earnings per item title
+        per_item = (
+          db.session.query(Item.title, func.sum(Auction.winning_bid))
+            .join(Auction, Auction.item_id==Item.id)
+            .filter(Auction.status=='closed')
+            .group_by(Item.id)
+            .all()
+        )
+    
+        # earnings per category
+        per_cat = (
+          db.session.query(Category.name, func.sum(Auction.winning_bid))
+            .join(Item, Item.category_id==Category.id)
+            .join(Auction, Auction.item_id==Item.id)
+            .filter(Auction.status=='closed')
+            .group_by(Category.id)
+            .all()
+        )
+    
+        # earnings per end-user
+        per_user = (
+          db.session.query(User.username, func.sum(Auction.winning_bid))
+            .join(Auction, Auction.winner_id==User.id)
+            .filter(Auction.status=='closed')
+            .group_by(User.id)
+            .all()
+        )
+    
+        return jsonify({
+          'total_earnings': total,
+          'earnings_per_item': per_item,
+          'earnings_per_category': per_cat,
+          'earnings_per_user': per_user
+        }), 200       
+    
     # -----------------------
     # Bidding Endpoints
     # -----------------------

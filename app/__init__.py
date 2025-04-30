@@ -393,25 +393,36 @@ def create_app():
     @app.route("/categories/create", methods=["GET","POST"])
     @login_required
     def create_category_form():
-        # pass existing categories if you want to allow nesting
+        # Determine where to go back to:
+        # Prefer a `next` query-param, else fall back to the Referer header,
+        # else default to home.
+        next_page = request.args.get('next') or request.referrer or url_for('home')
+
+        # Load existing categories for the dropdown
         categories = Category.query.order_by(Category.name).all()
 
         if request.method == "POST":
             name      = request.form.get("name","").strip()
             parent_id = request.form.get("parent_id", type=int) or None
-
             if not name:
-                return redirect(url_for("create_category_form"))
+                flash("Name is required.", "danger")
+                return redirect(request.url)
 
             cat = Category(name=name, parent_id=parent_id)
             db.session.add(cat)
             db.session.commit()
-            return redirect(url_for("create_item_form"))
+            flash("Category added!", "success")
 
+            # Send the user back to wherever they started
+            return redirect(next_page)
+
+        # GET → render the form, passing next_page into the template
         return render_template(
             "category/create.html",
-            categories=categories
+            categories=categories,
+            next_page=next_page
         )
+
     # @app.route('/categories', methods=['POST'])
     # def create_category():
     #     data = request.get_json(force=True)
@@ -527,11 +538,14 @@ def create_app():
         if current_user.id != id:
             return jsonify(message="Forbidden"), 403
 
-        alerts = Alert.query.filter_by(username=current_user.username).all()
-        return render_template(
-            "alerts/detail.html",
-            alerts=alerts
+        # Now each Alert *is* a notification, with its own description
+        alerts = (
+            Alert.query
+                .filter_by(username=current_user.username)
+                .order_by(Alert.created_at.desc())
+                .all()
         )
+        return render_template("alerts/detail.html", alerts=alerts)
     
     @app.route("/alerts/<int:alert_id>/delete", methods=["POST"])
     @login_required

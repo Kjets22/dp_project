@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-
 {% block title %}New Category{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
   <h2>Create Category</h2>
-  <form method="post" action="{{ url_for('create_category_form') }}">
+  <form method="post"
+        action="{{ url_for('create_category_form', next=next_page) }}">
     <!-- Category Name -->
     <div class="form-group">
       <label for="name">Category Name</label>
@@ -30,12 +30,15 @@
       </select>
     </div>
 
+    <!-- Hidden next field (redundant with query-param but safe) -->
+    <input type="hidden" name="next" value="{{ next_page }}">
+
     <!-- Submit -->
     <button type="submit" class="btn btn-success">
       Add Category
     </button>
-    <a href="{{ url_for('create_item_form') }}" class="btn btn-link">
-      ← Back to Create Item
+    <a href="{{ next_page }}" class="btn btn-link">
+      ← Back
     </a>
   </form>
 </div>

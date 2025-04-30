@@ -813,99 +813,99 @@ def create_app():
 
     # ── Admin: create customer‐rep accounts ─────────────────────────────────────
     
-    @app.route('/admin/create_rep', methods=['POST'])
-    @admin_required
-    def create_rep():
-        """
-        Only an admin may call this to spin up a new customer‐rep account.
-        """
-        data = request.get_json(force=True)
-        u = data.get('username'); p = data.get('password')
-        if not u or not p:
-            return jsonify(error="username and password required"), 400
-        if User.query.filter_by(username=u).first():
-            return jsonify(error="User already exists"), 400
+    # @app.route('/admin/create_rep', methods=['POST'])
+    # @admin_required
+    # def create_rep():
+    #     """
+    #     Only an admin may call this to spin up a new customer‐rep account.
+    #     """
+    #     data = request.get_json(force=True)
+    #     u = data.get('username'); p = data.get('password')
+    #     if not u or not p:
+    #         return jsonify(error="username and password required"), 400
+    #     if User.query.filter_by(username=u).first():
+    #         return jsonify(error="User already exists"), 400
     
-        rep = User(username=u, is_rep=True)
-        rep.set_password(p)
-        db.session.add(rep)
-        db.session.commit()
-        return jsonify(username=rep.username, is_rep=rep.is_rep), 201   
+    #     rep = User(username=u, is_rep=True)
+    #     rep.set_password(p)
+    #     db.session.add(rep)
+    #     db.session.commit()
+    #     return jsonify(username=rep.username, is_rep=rep.is_rep), 201   
     
     # ── Rep (or admin): reset any user’s password ───────────────────────────────
        
-    # reset any user's password
-    @app.route('/rep/reset_password/<string:username>', methods=['POST'])
-    @rep_required
-    def rep_reset_password(username):
-        data = request.get_json(force=True)
-        new_p = data.get('new_password')
-        if not new_p:
-            return jsonify(error="new_password required"), 400
-        user = User.query.filter_by(username=username).first_or_404()
-        user.set_password(new_p)
-        db.session.commit()
-        return jsonify(message=f"Password for {username} reset"), 200
+    # # reset any user's password
+    # @app.route('/rep/reset_password/<string:username>', methods=['POST'])
+    # @rep_required
+    # def rep_reset_password(username):
+    #     data = request.get_json(force=True)
+    #     new_p = data.get('new_password')
+    #     if not new_p:
+    #         return jsonify(error="new_password required"), 400
+    #     user = User.query.filter_by(username=username).first_or_404()
+    #     user.set_password(new_p)
+    #     db.session.commit()
+    #     return jsonify(message=f"Password for {username} reset"), 200
     
-    # remove an illegal bid
-    @app.route('/rep/remove_bid/<int:bid_id>', methods=['DELETE'])
-    @rep_required
-    def rep_remove_bid(bid_id):
-        bid = Bid.query.get_or_404(bid_id)
-        db.session.delete(bid)
-        db.session.commit()
-        return jsonify(message=f"Bid {bid_id} removed"), 200
+    # # remove an illegal bid
+    # @app.route('/rep/remove_bid/<int:bid_id>', methods=['DELETE'])
+    # @rep_required
+    # def rep_remove_bid(bid_id):
+    #     bid = Bid.query.get_or_404(bid_id)
+    #     db.session.delete(bid)
+    #     db.session.commit()
+    #     return jsonify(message=f"Bid {bid_id} removed"), 200
     
-    # remove an illegal auction
-    @app.route('/rep/remove_auction/<int:auction_id>', methods=['DELETE'])
-    @rep_required
-    def rep_remove_auction(auction_id):
-        auc = Auction.query.get_or_404(auction_id)
-        db.session.delete(auc)
-        db.session.commit()
-        return jsonify(message=f"Auction {auction_id} removed"), 200
+    # # remove an illegal auction
+    # @app.route('/rep/remove_auction/<int:auction_id>', methods=['DELETE'])
+    # @rep_required
+    # def rep_remove_auction(auction_id):
+    #     auc = Auction.query.get_or_404(auction_id)
+    #     db.session.delete(auc)
+    #     db.session.commit()
+    #     return jsonify(message=f"Auction {auction_id} removed"), 200
     
-    # ── Admin: sales summary report ──────────────────────────────────────────────
-    @app.route('/admin/reports/sales', methods=['GET'])
-    @admin_required
-    def report_sales():
-        # total earnings across all closed auctions
-        total = db.session.query(func.coalesce(func.sum(Auction.winning_bid), 0.0)).scalar()
+    # # ── Admin: sales summary report ──────────────────────────────────────────────
+    # @app.route('/admin/reports/sales', methods=['GET'])
+    # @admin_required
+    # def report_sales():
+    #     # total earnings across all closed auctions
+    #     total = db.session.query(func.coalesce(func.sum(Auction.winning_bid), 0.0)).scalar()
     
-        # earnings per item title
-        per_item = (
-          db.session.query(Item.title, func.sum(Auction.winning_bid))
-            .join(Auction, Auction.item_id==Item.id)
-            .filter(Auction.status=='closed')
-            .group_by(Item.id)
-            .all()
-        )
+    #     # earnings per item title
+    #     per_item = (
+    #       db.session.query(Item.title, func.sum(Auction.winning_bid))
+    #         .join(Auction, Auction.item_id==Item.id)
+    #         .filter(Auction.status=='closed')
+    #         .group_by(Item.id)
+    #         .all()
+    #     )
     
-        # earnings per category
-        per_cat = (
-          db.session.query(Category.name, func.sum(Auction.winning_bid))
-            .join(Item, Item.category_id==Category.id)
-            .join(Auction, Auction.item_id==Item.id)
-            .filter(Auction.status=='closed')
-            .group_by(Category.id)
-            .all()
-        )
+    #     # earnings per category
+    #     per_cat = (
+    #       db.session.query(Category.name, func.sum(Auction.winning_bid))
+    #         .join(Item, Item.category_id==Category.id)
+    #         .join(Auction, Auction.item_id==Item.id)
+    #         .filter(Auction.status=='closed')
+    #         .group_by(Category.id)
+    #         .all()
+    #     )
     
-        # earnings per end-user
-        per_user = (
-          db.session.query(User.username, func.sum(Auction.winning_bid))
-            .join(Auction, Auction.winner_id==User.id)
-            .filter(Auction.status=='closed')
-            .group_by(User.id)
-            .all()
-        )
+    #     # earnings per end-user
+    #     per_user = (
+    #       db.session.query(User.username, func.sum(Auction.winning_bid))
+    #         .join(Auction, Auction.winner_id==User.id)
+    #         .filter(Auction.status=='closed')
+    #         .group_by(User.id)
+    #         .all()
+    #     )
     
-        return jsonify({
-          'total_earnings': total,
-          'earnings_per_item': per_item,
-          'earnings_per_category': per_cat,
-          'earnings_per_user': per_user
-        }), 200       
+    #     return jsonify({
+    #       'total_earnings': total,
+    #       'earnings_per_item': per_item,
+    #       'earnings_per_category': per_cat,
+    #       'earnings_per_user': per_user
+    #     }), 200       
     
     # -----------------------
     # Bidding Endpoints
@@ -1112,13 +1112,13 @@ def create_app():
             })
         return jsonify(out), 200
 
-    @app.route("/users/<string:username>", methods=["POST"])
-    def create_user(username):
-        if User.query.filter_by(username=username).first():
-            return jsonify(error="User already exists"), 400
-        u = User(username=username)
-        db.session.add(u); db.session.commit()
-        return jsonify(username=u.username), 201
+    # @app.route("/users/<string:username>", methods=["POST"])
+    # def create_user(username):
+    #     if User.query.filter_by(username=username).first():
+    #         return jsonify(error="User already exists"), 400
+    #     u = User(username=username)
+    #     db.session.add(u); db.session.commit()
+    #     return jsonify(username=u.username), 201
 
     
     # @app.route('/auth/delete', methods=['DELETE'])
@@ -1491,5 +1491,65 @@ def create_app():
             questions=None
             # questions=questions
         )
+    @app.route('/rep/edit_user/<string:username>', methods=['GET','POST'])
+    @rep_required
+    def rep_edit_user(username):
+        user = User.query.filter_by(username=username).first_or_404()
+        if request.method == 'POST':
+            full_name = request.form.get('full_name','').strip()
+            dob_str   = request.form.get('date_of_birth','').strip()
+            user.full_name = full_name
+            try:
+                user.date_of_birth = datetime.fromisoformat(dob_str) if dob_str else None
+            except ValueError:
+                flash("Invalid date format; use YYYY-MM-DD.", "danger")
+                return redirect(request.url)
+            db.session.commit()
+            flash(f"User {username!r} updated.", "success")
+            return redirect(url_for('rep_detail', id=current_user.id))
+        return render_template('rep/edit_user.html', user=user)
+
+    # ── Rep: delete a regular user ────────────────────────────────────
+    @app.route('/rep/delete_user/<string:username>', methods=['POST'])
+    @rep_required
+    def rep_delete_user(username):
+        user = User.query.filter_by(username=username).first_or_404()
+        db.session.delete(user)
+        db.session.commit()
+        flash(f"User {username!r} deleted.", "info")
+        return redirect(url_for('rep_detail', id=current_user.id))
+    
+    # reset any user's password
+    @app.route('/rep/reset_password/<string:username>', methods=['POST'])
+    @rep_required
+    def rep_reset_password(username):
+        data = request.get_json(force=True)
+        new_p = data.get('new_password')
+        if not new_p:
+            return jsonify(error="new_password required"), 400
+        user = User.query.filter_by(username=username).first_or_404()
+        user.set_password(new_p)
+        db.session.commit()
+        return jsonify(message=f"Password for {username} reset"), 200
+    
+    # remove an illegal bid
+    @app.route('/rep/remove_bid/<int:bid_id>', methods=['POST'])
+    @rep_required
+    def rep_remove_bid(bid_id):
+        bid = Bid.query.get_or_404(bid_id)
+        db.session.delete(bid)
+        db.session.commit()
+        flash(f"Bid {bid_id} removed", "info")
+        return redirect(url_for('rep_detail', id=current_user.id))
+    
+    # remove an illegal auction
+    @app.route('/rep/remove_auction/<int:auction_id>', methods=['POST'])
+    @rep_required
+    def rep_remove_auction(auction_id):
+        auc = Auction.query.get_or_404(auction_id)
+        db.session.delete(auc)
+        db.session.commit()
+        flash(f"Auction {auction_id} removed", "info")
+        return redirect(url_for('rep_detail', id=current_user.id))
 
     return app

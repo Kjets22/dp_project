@@ -58,10 +58,12 @@
         <tr>
           <td>{{ u.username }}</td>
           <td>{{ u.full_name or '—' }}</td>
-          <td>{{ u.date_of_birth.strftime('%Y-%m-%d') if u.date_of_birth else '—' }}</td>
+          <td>{{ u.date_of_birth or '—' }}</td>
           <td>
-            <a href="{{ url_for('edit_user', username=u.username) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
-            <form action="{{ url_for('delete_user', username=u.username) }}" method="post" style="display:inline;">
+            <a href="{{ url_for('rep_edit_user', username=u.username) }}"
+               class="btn btn-sm btn-outline-secondary">Edit</a>
+            <form action="{{ url_for('rep_delete_user', username=u.username) }}"
+                  method="post" style="display:inline;">
               <button class="btn btn-sm btn-danger">Delete</button>
             </form>
           </td>

@@ -8,6 +8,7 @@ from flask_login import UserMixin
 class User(UserMixin, db.Model):
     id             = db.Column(db.Integer, primary_key=True)
     username       = db.Column(db.String(64), unique=True, nullable=False)
+    email          = db.Column(db.String(64), unique=True, nullable=False)
     password_hash  = db.Column(db.String(128), nullable=False)
     is_rep         = db.Column(db.Boolean, default=False, nullable=False)
     is_admin       = db.Column(db.Boolean, default=False, nullable=False)   
@@ -151,6 +152,25 @@ class Alert(db.Model):
     def __repr__(self):
         return f"<Alert {self.id} for {self.username}: {self.criteria_json}>"
 
-# class Question(db.Model):
-#     user_id            = db.Column(db.Integer, primary_key=True)
-#     username      = db.Column(db.String(64), nullable=False)
+
+class Question(db.Model):
+    __tablename__ = 'question'
+    id              = db.Column(db.Integer, primary_key=True)
+    user_id         = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    auction_id      = db.Column(db.Integer, db.ForeignKey('auction.id'), nullable=False)
+    question_text   = db.Column(db.Text,    nullable=False)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    answer_text     = db.Column(db.Text,    nullable=True)
+    answered_by_id  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    answered_at     = db.Column(db.DateTime, nullable=True)
+
+    # relationships
+    asker       = db.relationship('User', foreign_keys=[user_id], backref='questions')
+    answered_by = db.relationship('User', foreign_keys=[answered_by_id])
+    auction     = db.relationship('Auction', backref='questions')
+
+    
+    def __repr__(self):
+        return (f"<Question #{self.id} on auction={self.auction_id} "
+                f"asked_by=user_id={self.user_id!r}>")

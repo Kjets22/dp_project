@@ -197,6 +197,123 @@ def create_app():
         }
         return jsonify(resp), 200
     
+    # @app.route('/auctions/<int:auction_id>/questions', methods=['POST'])
+    # @login_required
+    # def ask_question(auction_id):
+    #     a = Auction.query.get_or_404(auction_id)
+    #     data = request.get_json(force=True)
+    #     text = data.get('question_text')
+    #     if not text:
+    #         return jsonify(error="question_text required"), 400
+    
+    #     q = Question(
+    #         user_id       = current_user.id,
+    #         auction_id    = auction_id,
+    #         question_text = text
+    #     )
+    #     db.session.add(q)
+    #     db.session.commit()
+    #     return jsonify(q.to_dict()), 201
+    
+    # #  ── Anyone can view questions & (if answered) their answers
+    # @app.route('/auctions/<int:auction_id>/questions', methods=['GET'])
+    # def list_questions(auction_id):
+    #     Auction.query.get_or_404(auction_id)
+    #     qs = Question.query.filter_by(auction_id=auction_id).all()
+    #     return jsonify([q.to_dict() for q in qs]), 200
+    
+    # #  ── Reps (or admin) post an answer
+    # @app.route('/questions/<int:question_id>/answer', methods=['POST'])
+    # @rep_required
+    # def answer_question(question_id):
+    #     q = Question.query.get_or_404(question_id)
+    #     if q.answer_text:
+    #         return jsonify(error="Already answered"), 400
+    
+    #     data = request.get_json(force=True)
+    #     ans = data.get('answer_text')
+    #     if not ans:
+    #         return jsonify(error="answer_text required"), 400
+    
+    #     q.answer_text    = ans
+    #     q.answered_by_id = current_user.id
+    #     q.answered_at    = datetime.utcnow()
+    #     db.session.commit()
+    #     return jsonify(q.to_dict()), 200
+
+    # ask a question
+    @app.route('/questions', methods=['POST'])
+    @login_required
+    def post_question():
+        data = request.get_json(force=True)
+        aid  = data.get('auction_id')
+        txt  = data.get('question')
+        if not aid or not txt:
+            return jsonify(error="auction_id and question required"), 400
+        # make sure auction exists
+        Auction.query.get_or_404(aid)
+        q = Question(
+            auction_id=aid,
+            user_id   =current_user.id,
+            question  =txt
+        )
+        db.session.add(q)
+        db.session.commit()
+        return jsonify(
+          id        =q.id,
+          auction_id=q.auction_id,
+          user_id   =q.user_id,
+          question  =q.question,
+          asked_at  =q.asked_at.isoformat()
+        ), 201
+
+    # list questions (all or by auction)
+    @app.route('/questions', methods=['GET'])
+    def list_questions():
+        aid = request.args.get('auction_id', type=int)
+        qs  = Question.query.filter_by(auction_id=aid).all() if aid else Question.query.all()
+        return jsonify([{
+          'id':          q.id,
+          'auction_id':  q.auction_id,
+          'user_id':     q.user_id,
+          'question':    q.question,
+          'answer':      q.answer,
+          'asked_at':    q.asked_at.isoformat(),
+          'answered_at': q.answered_at.isoformat() if q.answered_at else None
+        } for q in qs]), 200
+
+    # get one question
+    @app.route('/questions/<int:q_id>', methods=['GET'])
+    def get_question(q_id):
+        q = Question.query.get_or_404(q_id)
+        return jsonify({
+          'id':          q.id,
+          'auction_id':  q.auction_id,
+          'user_id':     q.user_id,
+          'question':    q.question,
+          'answer':      q.answer,
+          'asked_at':    q.asked_at.isoformat(),
+          'answered_at': q.answered_at.isoformat() if q.answered_at else None
+        }), 200
+
+    # customer-rep answers
+    @app.route('/questions/<int:q_id>/answer', methods=['POST'])
+    @rep_required
+    def answer_question(q_id):
+        data = request.get_json(force=True)
+        ans  = data.get('answer')
+        if not ans:
+            return jsonify(error="answer required"), 400
+        q = Question.query.get_or_404(q_id)
+        q.answer      = ans
+        q.answered_at = datetime.utcnow()
+        db.session.commit()
+        return jsonify(
+          id          =q.id,
+          answer      =q.answer,
+          answered_at =q.answered_at.isoformat()
+        ), 200
+    
      # -------------- (keep your existing routes) ----------------
     from app.models import User, Category, Item, Auction, Bid, Alert
 
@@ -354,12 +471,13 @@ def create_app():
     @app.route('/auth/register', methods=['POST'])
     def auth_register():
         data = request.get_json(force=True)
-        u = data.get('username'); p = data.get('password')
-        if not u or not p:
-            return jsonify(error="username and password required"), 400
+        u = data.get('username'); p = data.get('password'); e = data.get('email')
+        if not u or not p or not e:
+            return jsonify(error="username, password and email required"), 400
         if User.query.filter_by(username=u).first():
             return jsonify(error="User already exists"), 400
-        user = User(username=u)
+        # construct with email
+        user = User(username=u, email=e)
         user.set_password(p)
         db.session.add(user)
         db.session.commit()

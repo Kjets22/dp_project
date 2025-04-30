@@ -757,8 +757,13 @@ def create_app():
 
         # login_user will set up the session
         login_user(user)
-        # redirect to your user_detail view, which is /users/<id>
-        return redirect(url_for('user_detail', id=user.id))
+
+        if user.is_admin:
+            return redirect(url_for('admin_detail', id=user.id))
+        elif user.is_rep:
+            return redirect(url_for('rep_detail', id=user.id))
+        else:
+            return redirect(url_for('user_detail',  id=user.id))
     
     @app.route("/auth/<int:id>", methods=["GET"])
     @login_required
@@ -782,13 +787,18 @@ def create_app():
         # 3) Items they own
         created_items = user.items  # thanks to owner backref in Item model
 
-        return render_template(
-            "/auth/detail.html",
-            user=user,
-            created_items=created_items,
-            created_aucs=created_aucs,
-            participated=participated
-        )
+        if user.is_admin:
+            return redirect(url_for('admin_detail', id=user.id))
+        elif user.is_rep:
+            return redirect(url_for('rep_detail', id=user.id))
+        else:
+            return render_template(
+                "/auth/detail.html",
+                user=user,
+                created_items=created_items,
+                created_aucs=created_aucs,
+                participated=participated
+            )
     # def user_detail(id):
     #     user = User.query.get_or_404(id)
     #     print(1)
@@ -1343,4 +1353,143 @@ def create_app():
             max_price=max_price,
             selected_status=status
         )
+    @app.route('/admin/register', methods=['POST'])
+    def admin_register():
+        # if there’s already at least one admin, require you to be logged in as admin
+        has_admin = User.query.filter_by(is_admin=True).first() is not None
+        if has_admin:
+            if not current_user.is_authenticated or not current_user.is_admin:
+                return jsonify(error="Forbidden"), 403
+
+        data = request.get_json(force=True)
+        u = (data.get('username') or "").strip()
+        p = (data.get('password') or "").strip()
+        if not u or not p:
+            return jsonify(error="username and password required"), 400
+        if User.query.filter_by(username=u).first():
+            return jsonify(error="User exists"), 400
+
+        user = User(username=u, is_admin=True)
+        user.set_password(p)
+        db.session.add(user)
+        db.session.commit()
+        return jsonify(username=user.username, is_admin=user.is_admin), 201
+    
+    @app.route('/admin/<int:id>', methods=['GET'])
+    @admin_required
+    def admin_detail(id):
+        # only allow each admin to see their own dashboard
+        if current_user.id != id:
+            return jsonify(error="Forbidden"), 403
+
+        # total earnings of all closed auctions
+        total = (
+            db.session.query(func.coalesce(func.sum(Auction.winning_bid), 0.0))
+                .filter(Auction.status=='closed')
+                .scalar()
+        )
+
+        # earnings per item, descending
+        per_item = (
+            db.session.query(Item.title,
+                            func.coalesce(func.sum(Auction.winning_bid), 0.0).label('earnings'))
+            .join(Auction, Auction.item_id==Item.id)
+            .filter(Auction.status=='closed')
+            .group_by(Item.id)
+            .order_by(func.sum(Auction.winning_bid).desc())
+            .all()
+        )
+
+        # earnings per category
+        per_category = (
+            db.session.query(Category.name,
+                            func.coalesce(func.sum(Auction.winning_bid), 0.0))
+            .join(Item, Item.category_id==Category.id)
+            .join(Auction, Auction.item_id==Item.id)
+            .filter(Auction.status=='closed')
+            .group_by(Category.id)
+            .all()
+        )
+
+        # earnings per end‐user
+        per_user = (
+            db.session.query(User.username,
+                            func.coalesce(func.sum(Auction.winning_bid), 0.0))
+            .join(Auction, Auction.winner_id==User.id)
+            .filter(Auction.status=='closed')
+            .group_by(User.id)
+            .all()
+        )
+
+        # top 5 best‐selling items & best buyers
+        best_items  = per_item[:5]
+        best_buyers = per_user[:5]
+
+        return render_template(
+            'admin/detail.html',
+            total=total,
+            per_item=per_item,
+            per_category=per_category,
+            per_user=per_user,
+            best_items=best_items,
+            best_buyers=best_buyers
+        )
+
+    # ── Create Customer‐Rep ──────────────────────────────────
+    @app.route('/admin/create', methods=['GET','POST'])
+    @admin_required
+    def admin_create():
+        if request.method == 'POST':
+            username = request.form.get('username','').strip()
+            password = request.form.get('password','').strip()
+            if not username or not password:
+                flash("Both username and password are required.", "danger")
+                return redirect(request.url)
+            if User.query.filter_by(username=username).first():
+                flash("That username is already taken.", "danger")
+                return redirect(request.url)
+
+            rep = User(username=username, is_rep=True)
+            rep.set_password(password)
+            db.session.add(rep)
+            db.session.commit()
+            flash(f"Customer‐rep {username!r} created.", "success")
+            return redirect(url_for('admin_detail', id=current_user.id))
+
+        return render_template('admin/create.html')
+    
+        # ── Rep Dashboard ─────────────────────────────────────────
+    @app.route('/rep/<int:id>', methods=['GET'])
+    @rep_required
+    def rep_detail(id):
+        # Only the rep themselves (or an admin) can view their dashboard
+        if current_user.id != id and not current_user.is_admin:
+            return jsonify(error="Forbidden"), 403
+
+        # 1) All end‐users (for profile editing/deletion)
+        users = User.query.filter(
+            User.is_rep == False,
+            User.is_admin == False
+        ).all()
+
+        # 2) All bids (so you can remove illegal ones)
+        bids = Bid.query.order_by(Bid.timestamp.desc()).all()
+
+        # 3) All auctions (so you can remove illegal ones)
+        auctions = Auction.query.order_by(Auction.start_time.desc()).all()
+
+        # # 4) All user‐submitted questions (and replies)
+        # #    You’ll need a Question (and maybe Answer) model for this.
+        # from app.models import Question, Answer  # adjust if your models differ
+        # questions = Question.query.order_by(Question.created_at.desc()).all()
+
+        return render_template(
+            'rep/detail.html',
+            users=users,
+            bids=bids,
+            auctions=auctions,
+            questions=None
+            # questions=questions
+        )
+
     return app

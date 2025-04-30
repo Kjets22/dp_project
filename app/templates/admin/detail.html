@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Admin Dashboard</h2>
+  <hr>
+  <p>
+    <a href="{{ url_for('admin_create') }}" class="btn btn-primary">
+      Create Customer Representative
+    </a>
+  </p>
+
+  <h4>Sales Reports</h4>
+  <p><strong>Total Earnings:</strong> ${{ '%.2f' % total }}</p>
+
+  <h5>Earnings per Item</h5>
+  <ul class="list-group mb-3">
+    {% for title, earn in per_item %}
+      <li class="list-group-item">
+        {{ title }} — ${{ '%.2f' % earn }}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h5>Earnings per Category</h5>
+  <ul class="list-group mb-3">
+    {% for name, earn in per_category %}
+      <li class="list-group-item">
+        {{ name }} — ${{ '%.2f' % earn }}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h5>Earnings per End-User</h5>
+  <ul class="list-group mb-3">
+    {% for user, earn in per_user %}
+      <li class="list-group-item">
+        {{ user }} — ${{ '%.2f' % earn }}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h5>Top 5 Best-Selling Items</h5>
+  <ul class="list-group mb-3">
+    {% for title, earn in best_items %}
+      <li class="list-group-item">
+        {{ title }} — ${{ '%.2f' % earn }}
+      </li>
+    {% endfor %}
+  </ul>
+
+  <h5>Top 5 Buyers</h5>
+  <ul class="list-group">
+    {% for user, earn in best_buyers %}
+      <li class="list-group-item">
+        {{ user }} — ${{ '%.2f' % earn }}
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

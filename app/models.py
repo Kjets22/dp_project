@@ -124,7 +124,14 @@ class Bid(db.Model):
     amount      = db.Column(db.Float,   nullable=False)     # the current bid price
     max_bid     = db.Column(db.Float,   nullable=True)      # <— our new field
     timestamp   = db.Column(db.DateTime, default=datetime.utcnow)
-
+    bidder_id   = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    
+    person_bidder      = db.relationship(
+            'User', 
+            backref='bids', 
+            foreign_keys=[bidder_id])
+    
     # relationship back to Auction so you can do auction.bids
 
     auction     = db.relationship(

@@ -12,7 +12,7 @@ from werkzeug.security import check_password_hash
 db = SQLAlchemy()
 login = LoginManager()
 login.login_view = 'auth_login'
-
+sched = APScheduler()
 def admin_required(f):
     @wraps(f)
     @login_required

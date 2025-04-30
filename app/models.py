@@ -20,7 +20,6 @@ class User(UserMixin, db.Model):
         cascade='all, delete-orphan',
         foreign_keys='Auction.seller_id'
     )
-    # when a User is deleted, also delete everything they own:
     items = db.relationship(
         'Item',
         back_populates='owner',
@@ -43,7 +42,6 @@ class Category(db.Model):
     name     = db.Column(db.String(64), nullable=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
 
-    # self-referencing relationship:
     parent   = db.relationship('Category', remote_side=[id], backref='children')
 
     def to_dict(self):
@@ -64,7 +62,6 @@ class Item(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
     owner_id    = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-    # relationship back to Category
     category    = db.relationship('Category', backref=db.backref('items', lazy='dynamic'))
     auctions    = db.relationship(
         'Auction', back_populates='item',
@@ -99,17 +96,14 @@ class Auction(db.Model):
     winner_id     = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     winning_bid   = db.Column(db.Float, nullable=True)
     winner        = db.relationship('User', foreign_keys=[winner_id])
-    # relationships
     winning_id    = db.Column(db.Integer, default='open', nullable=True)
 
-    # relationships
     seller = db.relationship(
         'User',
         back_populates='auctions',
         foreign_keys=[seller_id]
     )
     item   = db.relationship('Item', back_populates='auctions')
-    # cascade bids when auction goes away
     bids   = db.relationship(
         'Bid',
         back_populates='auction',
@@ -123,12 +117,10 @@ class Auction(db.Model):
 class Bid(db.Model):
     id          = db.Column(db.Integer, primary_key=True)
     auction_id  = db.Column(db.Integer, db.ForeignKey('auction.id'), nullable=False)
-    bidder      = db.Column(db.String(64), nullable=False)  # username of who placed it
-    amount      = db.Column(db.Float,   nullable=False)     # the current bid price
-    max_bid     = db.Column(db.Float,   nullable=True)      # <— our new field
+    bidder      = db.Column(db.String(64), nullable=False)
+    amount      = db.Column(db.Float,   nullable=False)
+    max_bid     = db.Column(db.Float,   nullable=True)
     timestamp   = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # relationship back to Auction so you can do auction.bids
 
     auction     = db.relationship(
         'Auction',
@@ -140,8 +132,8 @@ class Bid(db.Model):
 
 class Alert(db.Model):
     id            = db.Column(db.Integer, primary_key=True)
-    username      = db.Column(db.String(64), nullable=False)  # who set the alert
-    criteria_json = db.Column(db.JSON,   nullable=False)      # e.g. {"category_id":1,"min_price":50}
+    username      = db.Column(db.String(64), nullable=False)
+    criteria_json = db.Column(db.JSON,   nullable=False)
     created_at    = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):

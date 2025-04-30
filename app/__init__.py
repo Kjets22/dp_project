@@ -521,30 +521,38 @@ def create_app():
     #         categories=categories,
     #         alerts=alerts
     #     )
+    @app.route("/alerts/<int:id>", methods=["GET"])
+    @login_required
+    def alert_detail(id):
+        if current_user.id != id:
+            return jsonify(message="Forbidden"), 403
 
+        alerts = Alert.query.filter_by(username=current_user.username).all()
+        return render_template(
+            "alerts/detail.html",
+            alerts=alerts
+        )
+    
     @app.route("/alerts/<int:alert_id>/delete", methods=["POST"])
     @login_required
     def delete_alert(alert_id):
         a = Alert.query.get_or_404(alert_id)
         if a.username != current_user.username:
-            abort(403)
+            return jsonify(message="Forbidden"), 403
         db.session.delete(a)
         db.session.commit()
         flash("Alert deleted", "info")
         return redirect(url_for("manage_alerts"))
 
-    @app.route("/alerts/<int:id>", methods=["GET","POST"])
+    @app.route("/alerts/<int:id>/create", methods=["GET","POST"])
     @login_required
-    def alert_detail(id):
-        # ensure users only see their own alerts
+    def create_alert(id):
         if current_user.id != id:
-            abort(403)
+            return jsonify(message="Forbidden"), 403
 
-        # load categories for the form
         categories = Category.query.order_by(Category.name).all()
 
         if request.method == "POST":
-            # build criteria JSON
             crit = {}
             cat_id    = request.form.get("category_id", type=int)
             min_price = request.form.get("min_price",   type=float)
@@ -557,19 +565,15 @@ def create_app():
             if max_price is not None:
                 crit["max_price"] = max_price
 
-            # save it
             a = Alert(username=current_user.username, criteria_json=crit)
             db.session.add(a)
             db.session.commit()
             flash("Alert created!", "success")
-            return redirect(url_for("alert_detail", id))
+            return redirect(url_for("alert_detail", id=id))
 
-        # GET → show existing + form
-        alerts = Alert.query.filter_by(username=current_user.username).all()
         return render_template(
-            "alerts/detail.html",
+            "alerts/create.html",
             categories=categories,
-            alerts=alerts
         )
 
 
@@ -586,25 +590,25 @@ def create_app():
             for a in alerts
         ]), 200
 
-    @app.route("/alerts/<string:username>", methods=["POST"])
-    def create_alert(username):
-        """
-        Create an alert for `username`.
-        JSON body is the criteria, e.g.:
-          { "category_id":1, "min_price":50 }
-        """
-        data = request.get_json(force=True)
-        if not isinstance(data, dict):
-            return jsonify(error="JSON object required"), 400
+    # @app.route("/alerts/<string:username>", methods=["POST"])
+    # def create_alert(username):
+    #     """
+    #     Create an alert for `username`.
+    #     JSON body is the criteria, e.g.:
+    #       { "category_id":1, "min_price":50 }
+    #     """
+    #     data = request.get_json(force=True)
+    #     if not isinstance(data, dict):
+    #         return jsonify(error="JSON object required"), 400
 
-        a = Alert(username=username, criteria_json=data)
-        db.session.add(a)
-        db.session.commit()
-        return jsonify(
-            id=a.id,
-            criteria_json=a.criteria_json,
-            created_at=a.created_at.isoformat()
-        ), 201
+    #     a = Alert(username=username, criteria_json=data)
+    #     db.session.add(a)
+    #     db.session.commit()
+    #     return jsonify(
+    #         id=a.id,
+    #         criteria_json=a.criteria_json,
+    #         created_at=a.created_at.isoformat()
+    #     ), 201
     
     login.init_app(app)
 

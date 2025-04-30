@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}My Alerts{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>My Alerts</h2>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{cat}}">{{msg}}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <!-- ── Create New Alert ─────────────────────────────────── -->
+  <form method="post" class="mb-4">
+    <div class="form-row">
+      <div class="col-md-4 mb-2">
+        <select name="category_id" class="form-control">
+          <option value="">Any Category</option>
+          {% for cat in categories %}
+            <option value="{{cat.id}}">{{cat.name}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 mb-2">
+        <input
+          type="number"
+          step="0.01"
+          name="min_price"
+          class="form-control"
+          placeholder="Min price"
+        >
+      </div>
+      <div class="col-md-3 mb-2">
+        <input
+          type="number"
+          step="0.01"
+          name="max_price"
+          class="form-control"
+          placeholder="Max price"
+        >
+      </div>
+      <div class="col-md-2 mb-2">
+        <button type="submit" class="btn btn-primary btn-block">
+          Create Alert
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <!-- ── Existing Alerts ───────────────────────────────────── -->
+  {% if alerts %}
+    <ul class="list-group">
+      {% for a in alerts %}
+        <li class="list-group-item">
+          <strong>Alert #{{ a.id }}</strong>:
+          {% if a.criteria_json.category_id %}
+            Category = {{ a.criteria_json.category_id }}
+          {% endif %}
+          {% if a.criteria_json.min_price is defined %}
+            , Min ${{ '%.2f' % a.criteria_json.min_price }}
+          {% endif %}
+          {% if a.criteria_json.max_price is defined %}
+            , Max ${{ '%.2f' % a.criteria_json.max_price }}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You have no alerts set.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -22,7 +22,7 @@ class User(UserMixin, db.Model):
         'Item',
         back_populates='owner',
         cascade='all, delete-orphan'
-    )    
+    )
      
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -70,7 +70,7 @@ class Item(db.Model):
     owner       = db.relationship(
         'User',
         back_populates='items'
-    ) 
+    )
     
     def to_dict(self):
         return {

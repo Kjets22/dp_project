@@ -488,6 +488,91 @@ def create_app():
     # Alerts Endpoints
     # -----------------------
 
+    # @app.route("/alerts", methods=["GET", "POST"])
+    # @login_required
+    # def manage_alerts():
+    #     # load all categories so the user can choose one (or none)
+    #     categories = Category.query.order_by(Category.name).all()
+
+    #     if request.method == "POST":
+    #         # build the criteria JSON from the form
+    #         crit = {}
+    #         cat_id = request.form.get("category_id", type=int)
+    #         if cat_id:
+    #             crit["category_id"] = cat_id
+    #         min_p = request.form.get("min_price", type=float)
+    #         if min_p is not None:
+    #             crit["min_price"] = min_p
+    #         max_p = request.form.get("max_price", type=float)
+    #         if max_p is not None:
+    #             crit["max_price"] = max_p
+
+    #         # save the alert
+    #         a = Alert(username=current_user.username, criteria_json=crit)
+    #         db.session.add(a)
+    #         db.session.commit()
+    #         flash("Alert created!", "success")
+    #         return redirect(url_for("manage_alerts"))
+
+    #     # GET → show existing + creation form
+    #     alerts = Alert.query.filter_by(username=current_user.username).all()
+    #     return render_template(
+    #         "alerts/alerts.html",
+    #         categories=categories,
+    #         alerts=alerts
+    #     )
+
+    @app.route("/alerts/<int:alert_id>/delete", methods=["POST"])
+    @login_required
+    def delete_alert(alert_id):
+        a = Alert.query.get_or_404(alert_id)
+        if a.username != current_user.username:
+            abort(403)
+        db.session.delete(a)
+        db.session.commit()
+        flash("Alert deleted", "info")
+        return redirect(url_for("manage_alerts"))
+
+    @app.route("/alerts/<int:id>", methods=["GET","POST"])
+    @login_required
+    def alert_detail(id):
+        # ensure users only see their own alerts
+        if current_user.id != id:
+            abort(403)
+
+        # load categories for the form
+        categories = Category.query.order_by(Category.name).all()
+
+        if request.method == "POST":
+            # build criteria JSON
+            crit = {}
+            cat_id    = request.form.get("category_id", type=int)
+            min_price = request.form.get("min_price",   type=float)
+            max_price = request.form.get("max_price",   type=float)
+
+            if cat_id:
+                crit["category_id"] = cat_id
+            if min_price is not None:
+                crit["min_price"] = min_price
+            if max_price is not None:
+                crit["max_price"] = max_price
+
+            # save it
+            a = Alert(username=current_user.username, criteria_json=crit)
+            db.session.add(a)
+            db.session.commit()
+            flash("Alert created!", "success")
+            return redirect(url_for("alert_detail", id))
+
+        # GET → show existing + form
+        alerts = Alert.query.filter_by(username=current_user.username).all()
+        return render_template(
+            "alerts/detail.html",
+            categories=categories,
+            alerts=alerts
+        )
+
+
     @app.route("/alerts/<string:username>", methods=["GET"])
     def list_alerts(username):
         """List all alerts for a given user."""

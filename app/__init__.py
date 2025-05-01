@@ -6,12 +6,14 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_apscheduler import APScheduler
+from flask_mail import Mail, Message
 from sqlalchemy import func
 from werkzeug.security import check_password_hash
 
 db = SQLAlchemy()
 login = LoginManager()
 login.login_view = 'auth_login'
+mail = Mail()
 sched = APScheduler()
 def admin_required(f):
     @wraps(f)
@@ -34,6 +36,7 @@ def rep_required(f):
 def create_app():
     app = Flask(__name__)
     app.config.from_object("config.Config")
+    mail.init_app(app)
 
     # Initialize & create tables
     db.init_app(app)
@@ -204,7 +207,11 @@ def create_app():
                 flash("You’re already the highest bidder.", "warning")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
-            required_min = current_price + auction.increment
+            # Remember the previous top‐bidder so we can alert them
+            prev_top = top
+            prev_bidder_id = prev_top.bidder_id if prev_top else None
+
+            required_min = (top.amount if top else auction.init_price) + auction.increment
             max_raw      = request.form.get("max_bid","").strip()
             amt_raw      = request.form.get("bid_amount","").strip()
 
@@ -246,6 +253,24 @@ def create_app():
             db.session.commit()
             flash("Your bid was placed!", "success")
 
+            # **Send “You’ve been outbid” email to the previous leader** ###
+            if prev_bidder_id and prev_bidder_id != current_user.id:
+                prev_user = User.query.get(prev_bidder_id)
+                if prev_user and prev_user.email:
+                    with app.app_context():
+                        msg = Message(
+                            subject="You’ve been outbid!",
+                            recipients=[prev_user.email]
+                        )
+                        msg.body = (
+                            f"Hi {prev_user.username},\n\n"
+                            f"You were the highest bidder on “{item.title}” "
+                            f"but have just been outbid at ${bid_amt:.2f}.\n"
+                            "If you want to place a higher bid, go back to the auction now!\n\n"
+                            "– The Auction Team"
+                        )
+                        mail.send(msg)
+
             # 3) Auto‐bidding among all ceilings
             proxies = {}
             for b in Bid.query.filter_by(auction_id=auc_id):
@@ -265,7 +290,7 @@ def create_app():
                 if nxt_price > nxt_max:
                     break
 
-                # determine bidder_id for the next bidder (handles anonymousXXX)
+                # figure out bidder_id for the autobid
                 if nxt.startswith("anonymous"):
                     try:
                         anon_id = int(nxt.replace("anonymous",""))
@@ -276,7 +301,6 @@ def create_app():
                     real = User.query.filter_by(username=nxt).first()
                     auto_bidder_id = real.id if real else None
 
-                # place auto‐bid
                 auto = Bid(
                     auction_id = auc_id,
                     bidder     = nxt,
@@ -307,6 +331,7 @@ def create_app():
             current_price=  current_price,
             highest_bidder= highest_bidder
         )
+
 
 
     @app.route('/auctions', methods=['GET'])

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}My Alerts{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>My Alerts</h2>
+
+  {% if alerts %}
+    <ul class="list-group mb-4">
+      {% for a in alerts %}
+        <li class="list-group-item">
+          <strong>Alert #{{ a.id }}</strong>:
+          {% if a.criteria_json.category_id %}
+            Category = {{ a.criteria_json.category_id }}
+          {% endif %}
+          {% if a.criteria_json.min_price is defined %}
+            , Min ${{ '%.2f' % a.criteria_json.min_price }}
+          {% endif %}
+          {% if a.criteria_json.max_price is defined %}
+            , Max ${{ '%.2f' % a.criteria_json.max_price }}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You have no alerts set.</p>
+  {% endif %}
+</div>
+{% endblock %}

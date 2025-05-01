@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}{{ user.username }}’s Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>{{ user.full_name }} (<small>{{ user.username }}</small>)</h2>
+
+  {% if current_user.is_authenticated and current_user.id == user.id %}
+    <hr>
+    <a href="{{ url_for('qna') }}" class="btn btn-outline-info ml-2">
+      ❓ Q&A Center
+    </a>
+    <!-- <a href="{{ url_for('create_alert', id=current_user.id) }}"
+        class="btn btn-outline-warning ml-2">
+      <span class="mr-1">⏰</span>New Alert
+    </a> -->
+  {% endif %}
+
+  <p class="mt-3"><em>DOB: {{ user.date_of_birth.strftime('%B %-d, %Y') }}</em></p>
+  <hr>
+  <h4>Your Items</h4>
+  {% if created_items %}
+    <ul class="list-group mb-4">
+      {% for item in created_items %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <a href="{{ url_for('item_detail', item_id=item.id) }}">{{ item.title }}</a>
+          {% if current_user.id == user.id and not item.auctions %}
+            <a href="{{ url_for('open_auction', item_id=item.id) }}"
+               class="btn btn-sm btn-outline-primary">Create Auction</a>
+          {% elif current_user.id == user.id %}
+            <span class="badge badge-secondary">Already Auctioned</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t created any items yet.</p>
+  {% endif %}
+
+  <hr>
+  <h4>Your Auctions (Selling)</h4>
+  {% if created_aucs %}
+    <ul class="list-group mb-4">
+      {% for a in created_aucs %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            Auction #{{ a.id }} for “{{ a.item.title }}” —
+            ends {{ a.end_time.strftime('%b %-d, %Y %H:%M') }} —
+            status: {{ a.status }}
+          </div>
+          <a href="{{ url_for('auction_detail', auc_id=a.id) }}"
+             class="btn btn-sm btn-outline-secondary">View</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t started any auctions yet.</p>
+  {% endif %}
+
+  <hr>
+  <h4>Auctions You Bid On</h4>
+  {% if participated %}
+    <ul class="list-group">
+      {% for a in participated %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            Auction #{{ a.id }} for “{{ a.item.title }}” —
+            your highest bid:
+            {% set your_bids = a.bids
+                              | selectattr('bidder','equalto',user.username)
+                              | list %}
+            {% set max_bid = your_bids | map(attribute='amount') | max %}
+            {{ max_bid }} —
+            ends {{ a.end_time.strftime('%b %-d, %Y %H:%M') }}
+          </div>
+          <a href="{{ url_for('auction_detail', auc_id=a.id) }}"
+             class="btn btn-sm btn-outline-secondary">View</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t placed any bids yet.</p>
+  {% endif %}
+
+  <form action="{{ url_for('auth_delete') }}" method="get" class="d-inline-block mr-2">
+    <button type="submit" class="btn btn-danger">Delete My Account</button>
+  </form>
+  <a href="{{ url_for('home') }}" class="btn btn-outline-secondary mt-4">← Back to Home</a>
+</div>
+{% endblock %}

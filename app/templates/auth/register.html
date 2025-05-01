@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block title %}Create User{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-title">
+        <h4>Create User</h4>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('auth_register') }}"
+              id="register-form" novalidate>
+
+          <div class="form-group">
+            <label>Username</label>
+            <input name="username" type="text" class="form-control"
+                   id="username-input" required>
+            <small class="form-text text-muted">
+              This will be your login username.
+            </small>
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary mt-2"
+                    id="check-username-btn">
+              Check Availability
+            </button>
+            <div id="username-check-result" class="mt-2"></div>
+          </div>
+
+          <div class="form-group">
+            <label>Password</label>
+            <input name="password" type="password"
+                   class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label>Full Name</label>
+            <input name="full_name" type="text"
+                   class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input name="date_of_birth" type="date"
+                   class="form-control" required>
+          </div>
+
+          <div class="form-group">
+            <label for="email-input">Email</label>
+            <input name="email" type="email"
+                   class="form-control" id="email-input" required>
+            <small class="form-text text-muted">
+              We’ll never share your email.
+            </small>
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary mt-2"
+                    id="check-email-btn">
+              Check Email
+            </button>
+            <div id="email-check-result" class="mt-2"></div>
+          </div>
+
+          <button type="submit" class="btn btn-primary mt-3"
+                  id="submit-btn" disabled>
+            Create Account
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // state flags
+  let usernameChecked = false, usernameAvailable = false;
+  let emailChecked    = false, emailAvailable    = false;
+
+  // element refs
+  const unameInput   = document.getElementById('username-input');
+  const checkUBtn    = document.getElementById('check-username-btn');
+  const uResultDiv   = document.getElementById('username-check-result');
+
+  const emailInput   = document.getElementById('email-input');
+  const checkEBtn    = document.getElementById('check-email-btn');
+  const eResultDiv   = document.getElementById('email-check-result');
+
+  const submitBtn    = document.getElementById('submit-btn');
+  const form         = document.getElementById('register-form');
+
+  // helper to update submit-button state
+  function updateSubmitState(){
+    if(usernameChecked && usernameAvailable
+       && emailChecked && emailAvailable) {
+      submitBtn.disabled = false;
+    } else {
+      submitBtn.disabled = true;
+    }
+  }
+
+  // ── Username check ──────────────────────────────────────────────────────
+  checkUBtn.addEventListener('click', async () => {
+    const u = unameInput.value.trim();
+    usernameChecked = usernameAvailable = false;
+    submitBtn.disabled = true;
+    uResultDiv.textContent = '';
+    uResultDiv.classList.remove('text-success','text-danger');
+
+    if(!u){
+      uResultDiv.textContent = '⚠️ Enter a username first.';
+      uResultDiv.classList.add('text-danger');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/auth/check_username?username=${encodeURIComponent(u)}`);
+      if(!res.ok) throw new Error((await res.json()).error||'Server error');
+      const { available } = await res.json();
+      usernameChecked = true;
+      if(available){
+        usernameAvailable = true;
+        uResultDiv.textContent = '✅ Username is available!';
+        uResultDiv.classList.add('text-success');
+      } else {
+        uResultDiv.textContent = '❌ Username taken.';
+        uResultDiv.classList.add('text-danger');
+      }
+    } catch(err){
+      uResultDiv.textContent = `Error: ${err.message}`;
+      uResultDiv.classList.add('text-danger');
+    }
+    updateSubmitState();
+  });
+
+  // ── Email check ─────────────────────────────────────────────────────────
+  checkEBtn.addEventListener('click', async () => {
+    const e = emailInput.value.trim();
+    emailChecked = emailAvailable = false;
+    submitBtn.disabled = true;
+    eResultDiv.textContent = '';
+    eResultDiv.classList.remove('text-success','text-danger');
+
+    if(!e){
+      eResultDiv.textContent = '⚠️ Enter an email first.';
+      eResultDiv.classList.add('text-danger');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/auth/check_email?email=${encodeURIComponent(e)}`);
+      if(!res.ok) throw new Error((await res.json()).error||'Server error');
+      const { available } = await res.json();
+      emailChecked = true;
+      if(available){
+        emailAvailable = true;
+        eResultDiv.textContent = '✅ Email is free to use!';
+        eResultDiv.classList.add('text-success');
+      } else {
+        eResultDiv.textContent = '❌ Email already registered.';
+        eResultDiv.classList.add('text-danger');
+      }
+    } catch(err){
+      eResultDiv.textContent = `Error: ${err.message}`;
+      eResultDiv.classList.add('text-danger');
+    }
+    updateSubmitState();
+  });
+
+  // ── Final form submit guard ──────────────────────────────────────────────
+  form.addEventListener('submit', e => {
+    if(!(usernameChecked && usernameAvailable
+         && emailChecked && emailAvailable)) {
+      e.preventDefault();
+      alert('Please ensure you’ve checked both username & email availability.');
+    }
+  });
+</script>
+{% endblock %}

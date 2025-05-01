@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Create Item{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Create Item</h2>
+
+  {% if current_user.is_authenticated %}
+    <form method="post">
+      <div class="form-group">
+        <label for="category_id">Category</label>
+        <div class="input-group">
+          <select
+            id="category_id"
+            name="category_id"
+            class="form-control"
+            required
+          >
+            <option value="" disabled selected>– Select a category –</option>
+            {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="input-group-append">
+            <a
+              href="{{ url_for('create_category_form') }}"
+              class="btn btn-outline-secondary"
+            >+ New Category</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="title">Title</label>
+        <input
+          id="title"
+          name="title"
+          type="text"
+          class="form-control"
+          placeholder="Enter item title"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea
+          id="description"
+          name="description"
+          class="form-control"
+          rows="3"
+          required
+        ></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary mt-3" href="{{ url_for('create_item_form')}}">
+        Create Item
+      </button>
+    </form>
+
+  {% else %}
+    <div class="alert alert-warning mt-4">
+      You must be logged in to create an item.
+    </div>
+    <a
+      class="btn btn-outline-primary"
+      href="{{ url_for('auth_login') }}"
+    >
+      Go to Login
+    </a>
+  {% endif %}
+</div>
+{% endblock %}

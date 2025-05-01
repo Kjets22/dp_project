@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Home – All Items{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3>All Items</h3>
+
+  {% if items %}
+    <div class="row">
+      {% for item in items %}
+        <div class="col-6 col-sm-4 col-md-3 mb-4">
+          <div class="card h-100">
+            <div class="card-body d-flex flex-column">
+              <h5 class="card-title mb-2">
+                <a href="{{ url_for('item_detail', item_id=item.id) }}">
+                  {{ item.title }}
+                </a>
+              </h5>
+
+              {# Find any open or closed auction #}
+              {% set open_auction   = item.auctions 
+                                      | selectattr('status','equalto','open') 
+                                      | first %}
+              {% set closed_auction = item.auctions 
+                                      | selectattr('status','equalto','closed') 
+                                      | first %}
+
+              <div class="mt-auto">
+                {% if open_auction %}
+                  {# Still open: show current high bid #}
+                  {% if open_auction.bids %}
+                    {% set highest = open_auction.bids 
+                                      | map(attribute='amount') 
+                                      | max %}
+                  {% else %}
+                    {% set highest = open_auction.init_price %}
+                  {% endif %}
+                  <small class="text-success">
+                    Open — Current Price: ${{ '%.2f' % highest }}
+                  </small>
+
+                {% elif closed_auction %}
+                  {# Closed: show sold *only* if reserve met #}
+                  {% if closed_auction.winning_bid is not none
+                        and closed_auction.winning_bid >= closed_auction.reserve_price %}
+                    <small class="text-muted">
+                      Closed — Sold for ${{ '%.2f' % closed_auction.winning_bid }}
+                    </small>
+                  {% else %}
+                    <small class="text-warning">
+                      Closed — Reserve Not Met
+                    </small>
+                  {% endif %}
+
+                {% else %}
+                  {# Never opened #}
+                  <small class="text-muted">
+                    Not up for auction
+                  </small>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-muted">No items available yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

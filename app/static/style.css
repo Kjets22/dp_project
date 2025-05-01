@@ -1,0 +1,80 @@
+/* style.css */
+body {
+    font-family: 'Poppins', sans-serif;
+    background: #f9f9f9;
+    margin: 0;
+    padding: 0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  .site-brand a {
+    font-size: 3rem;
+    font-weight: 800;
+    background: linear-gradient(to right, #ff416c, #ff4b2b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-decoration: none;
+    display: inline-block;
+    padding: 1rem 0;
+  }
+  
+  .navbar {
+    background-color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+  
+  .btn {
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .btn:active {
+    transform: scale(0.95);
+  }
+  
+  .list-group-item .btn,
+  .card .btn {
+    margin-left: auto;
+  }
+  
+  .list-group-item,
+  .card {
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    background-color: #fff;
+    border: 1px solid #eee;
+  }
+  
+  .dark-mode {
+    background-color: #121212;
+    color: #f0f0f0;
+  }
+  
+  .dark-mode .navbar {
+    background-color: #1e1e1e;
+  }
+  
+  .dark-mode .site-brand a {
+    -webkit-text-fill-color: #fff;
+  }
+  
+  .dark-mode .btn {
+    border-color: #aaa;
+    color: #fff;
+  }
+  
+  .dark-mode .btn:hover {
+    background-color: #333;
+    border-color: #888;
+  }
+  
+  .dark-mode .list-group-item,
+  .dark-mode .card {
+    background-color: #1e1e1e;
+    border-color: #333;
+  }
+      

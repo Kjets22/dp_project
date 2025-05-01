@@ -1,0 +1,56 @@
+<!-- base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}BuyMe{% endblock %}</title>
+
+  <!-- Bootstrap -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <!-- Logo / Brand -->
+  <div class="site-brand text-center">
+    <a href="{{ url_for('home') }}">BuyMe</a>
+  </div>
+
+  <!-- Navbar -->
+  <div class="navbar d-flex flex-wrap justify-content-center align-items-center p-3">
+    <a href="{{ url_for('home') }}" class="btn btn-outline-primary m-1">Home</a>
+    {% if current_user.is_authenticated %}
+      <a href="{{ url_for('user_detail', id=current_user.id) }}" class="btn btn-outline-secondary m-1">My Page</a>
+      <a href="{{ url_for('create_item_form') }}" class="btn btn-outline-secondary m-1">Create</a>
+      <a href="{{ url_for('browse') }}" class="btn btn-outline-secondary m-1">Browse</a>
+      <a href="{{ url_for('alert_detail', id=current_user.id) }}" class="btn btn-outline-secondary m-1">Alerts</a>
+      <form method="POST" action="{{ url_for('auth_logout') }}" class="m-1">
+        <button type="submit" class="btn btn-danger">Logout</button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('auth_login') }}" class="btn btn-warning m-1">Login</a>
+    {% endif %}
+    <button onclick="toggleDarkMode()" class="btn btn-dark m-1">🌙 Dark Mode</button>
+  </div>
+
+  {% block content %}{% endblock %}
+
+  <!-- Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+
+  <!-- Dark Mode Toggle -->
+  <script>
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+      localStorage.setItem("darkMode", document.body.classList.contains("dark-mode"));
+    }
+    if (localStorage.getItem("darkMode") === "true") {
+      document.body.classList.add("dark-mode");
+    }
+  </script>
+</body>
+</html>

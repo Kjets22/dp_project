@@ -315,20 +315,27 @@ def create_app():
     #     ), 200
 
     # — ask a question (buyer)
+
     @app.route('/questions', methods=['POST'])
     @login_required
     def ask_question():
         data = request.get_json(force=True)
-        aq = data.get('auction_id')
-        txt = data.get('question')
+        aq   = data.get('auction_id')
+        txt  = data.get('question')
         if not aq or not txt:
             return jsonify(error="auction_id and question required"), 400
-        # verify auction exists
         Auction.query.get_or_404(aq)
-        q = Question(auction_id=aq, asker_id=current_user.id, question=txt)
+        q = Question(
+            auction_id   = aq,
+            user_id      = current_user.id,
+            question_text= txt
+        )
         db.session.add(q)
         db.session.commit()
-        return jsonify(id=q.id, asked_at=q.asked_at.isoformat()), 201
+        return jsonify(
+            id         = q.id,
+            created_at = q.created_at.isoformat()
+        ), 201
     
     # — list questions (optionally filter by auction)
     @app.route('/questions', methods=['GET'])
@@ -338,32 +345,33 @@ def create_app():
         q = Question.query
         if aq is not None:
             q = q.filter_by(auction_id=aq)
-        qs = q.order_by(Question.asked_at).all()
+         # order by the real timestamp column:
+        qs = q.order_by(Question.created_at).all()
         return jsonify([{
-          'id':          q.id,
-          'auction_id':  q.auction_id,
-          'asker_id':    q.asker_id,
-          'question':    q.question,
-          'asked_at':    q.asked_at.isoformat(),
-          'answer':      q.answer,
-          'answered_at': q.answered_at and q.answered_at.isoformat()
-        } for q in qs]), 200
-    
+          'id':           ques.id,
+          'auction_id':   ques.auction_id,
+          'asker_id':     ques.user_id,
+          'question':     ques.question_text,
+          'asked_at':     ques.created_at.isoformat(),
+          'answer':       ques.answer_text,
+          'answered_at':  ques.answered_at and ques.answered_at.isoformat()
+        } for ques in qs]), 200   
+
     # — get one question
     @app.route('/questions/<int:q_id>', methods=['GET'])
     @login_required
     def get_question(q_id):
-        q = Question.query.get_or_404(q_id)
+        ques = Question.query.get_or_404(q_id)
         return jsonify({
-          'id':          q.id,
-          'auction_id':  q.auction_id,
-          'asker_id':    q.asker_id,
-          'question':    q.question,
-          'asked_at':    q.asked_at.isoformat(),
-          'answer':      q.answer,
-          'answered_at': q.answered_at and q.answered_at.isoformat()
-        }), 200
-    
+          'id':           ques.id,
+          'auction_id':   ques.auction_id,
+          'asker_id':     ques.user_id,
+          'question':     ques.question_text,
+          'asked_at':     ques.created_at.isoformat(),
+          'answer':       ques.answer_text,
+          'answered_at':  ques.answered_at and ques.answered_at.isoformat()
+        }), 200   
+
     # — rep answers a question
     @app.route('/questions/<int:q_id>/answer', methods=['POST'])
     @rep_required
@@ -379,7 +387,7 @@ def create_app():
         return jsonify(message="answered", answered_at=q.answered_at.isoformat()), 200
         
      # -------------- (keep your existing routes) ----------------
-    from app.models import User, Category, Item, Auction, Bid, Alert
+    from app.models import User, Category, Item, Auction, Bid, Alert, Question
 
     @app.route("/users", methods=["GET"])
     def list_users():

@@ -487,81 +487,153 @@ def create_app():
     #     db.session.commit()
     #     return jsonify(q.to_dict()), 200
 
-    # ask a question
+    # # ask a question
+    # @app.route('/questions', methods=['POST'])
+    # @login_required
+    # def post_question():
+    #     data = request.get_json(force=True)
+    #     aid  = data.get('auction_id')
+    #     txt  = data.get('question')
+    #     if not aid or not txt:
+    #         return jsonify(error="auction_id and question required"), 400
+    #     # make sure auction exists
+    #     Auction.query.get_or_404(aid)
+    #     q = Question(
+    #         auction_id=aid,
+    #         user_id   =current_user.id,
+    #         question  =txt
+    #     )
+    #     db.session.add(q)
+    #     db.session.commit()
+    #     return jsonify(
+    #       id        =q.id,
+    #       auction_id=q.auction_id,
+    #       user_id   =q.user_id,
+    #       question  =q.question,
+    #       asked_at  =q.asked_at.isoformat()
+    #     ), 201
+
+    # # list questions (all or by auction)
+    # @app.route('/questions', methods=['GET'])
+    # def list_questions():
+    #     aid = request.args.get('auction_id', type=int)
+    #     qs  = Question.query.filter_by(auction_id=aid).all() if aid else Question.query.all()
+    #     return jsonify([{
+    #       'id':          q.id,
+    #       'auction_id':  q.auction_id,
+    #       'user_id':     q.user_id,
+    #       'question':    q.question,
+    #       'answer':      q.answer,
+    #       'asked_at':    q.asked_at.isoformat(),
+    #       'answered_at': q.answered_at.isoformat() if q.answered_at else None
+    #     } for q in qs]), 200
+
+    # # get one question
+    # @app.route('/questions/<int:q_id>', methods=['GET'])
+    # def get_question(q_id):
+    #     q = Question.query.get_or_404(q_id)
+    #     return jsonify({
+    #       'id':          q.id,
+    #       'auction_id':  q.auction_id,
+    #       'user_id':     q.user_id,
+    #       'question':    q.question,
+    #       'answer':      q.answer,
+    #       'asked_at':    q.asked_at.isoformat(),
+    #       'answered_at': q.answered_at.isoformat() if q.answered_at else None
+    #     }), 200
+
+    # # customer-rep answers
+    # @app.route('/questions/<int:q_id>/answer', methods=['POST'])
+    # @rep_required
+    # def answer_question(q_id):
+    #     data = request.get_json(force=True)
+    #     ans  = data.get('answer')
+    #     if not ans:
+    #         return jsonify(error="answer required"), 400
+    #     q = Question.query.get_or_404(q_id)
+    #     q.answer      = ans
+    #     q.answered_at = datetime.utcnow()
+    #     db.session.commit()
+    #     return jsonify(
+    #       id          =q.id,
+    #       answer      =q.answer,
+    #       answered_at =q.answered_at.isoformat()
+    #     ), 200
+
+    # — ask a question (buyer)
+
     @app.route('/questions', methods=['POST'])
     @login_required
-    def post_question():
+    def ask_question():
         data = request.get_json(force=True)
-        aid  = data.get('auction_id')
+        aq   = data.get('auction_id')
         txt  = data.get('question')
-        if not aid or not txt:
+        if not aq or not txt:
             return jsonify(error="auction_id and question required"), 400
-        # make sure auction exists
-        Auction.query.get_or_404(aid)
+        Auction.query.get_or_404(aq)
         q = Question(
-            auction_id=aid,
-            user_id   =current_user.id,
-            question  =txt
+            auction_id   = aq,
+            user_id      = current_user.id,
+            question_text= txt
         )
         db.session.add(q)
         db.session.commit()
         return jsonify(
-          id        =q.id,
-          auction_id=q.auction_id,
-          user_id   =q.user_id,
-          question  =q.question,
-          asked_at  =q.asked_at.isoformat()
+            id         = q.id,
+            created_at = q.created_at.isoformat()
         ), 201
-
-    # list questions (all or by auction)
+    
+    # — list questions (optionally filter by auction)
     @app.route('/questions', methods=['GET'])
+    @login_required
     def list_questions():
-        aid = request.args.get('auction_id', type=int)
-        qs  = Question.query.filter_by(auction_id=aid).all() if aid else Question.query.all()
+        aq = request.args.get('auction_id', type=int)
+        q = Question.query
+        if aq is not None:
+            q = q.filter_by(auction_id=aq)
+         # order by the real timestamp column:
+        qs = q.order_by(Question.created_at).all()
         return jsonify([{
-          'id':          q.id,
-          'auction_id':  q.auction_id,
-          'user_id':     q.user_id,
-          'question':    q.question,
-          'answer':      q.answer,
-          'asked_at':    q.asked_at.isoformat(),
-          'answered_at': q.answered_at.isoformat() if q.answered_at else None
-        } for q in qs]), 200
+          'id':           ques.id,
+          'auction_id':   ques.auction_id,
+          'asker_id':     ques.user_id,
+          'question':     ques.question_text,
+          'asked_at':     ques.created_at.isoformat(),
+          'answer':       ques.answer_text,
+          'answered_at':  ques.answered_at and ques.answered_at.isoformat()
+        } for ques in qs]), 200   
 
-    # get one question
+    # — get one question
     @app.route('/questions/<int:q_id>', methods=['GET'])
+    @login_required
     def get_question(q_id):
-        q = Question.query.get_or_404(q_id)
+        ques = Question.query.get_or_404(q_id)
         return jsonify({
-          'id':          q.id,
-          'auction_id':  q.auction_id,
-          'user_id':     q.user_id,
-          'question':    q.question,
-          'answer':      q.answer,
-          'asked_at':    q.asked_at.isoformat(),
-          'answered_at': q.answered_at.isoformat() if q.answered_at else None
-        }), 200
+          'id':           ques.id,
+          'auction_id':   ques.auction_id,
+          'asker_id':     ques.user_id,
+          'question':     ques.question_text,
+          'asked_at':     ques.created_at.isoformat(),
+          'answer':       ques.answer_text,
+          'answered_at':  ques.answered_at and ques.answered_at.isoformat()
+        }), 200   
 
-    # customer-rep answers
+    # — rep answers a question
     @app.route('/questions/<int:q_id>/answer', methods=['POST'])
     @rep_required
     def answer_question(q_id):
+        q = Question.query.get_or_404(q_id)
         data = request.get_json(force=True)
-        ans  = data.get('answer')
+        ans = data.get('answer')
         if not ans:
             return jsonify(error="answer required"), 400
-        q = Question.query.get_or_404(q_id)
         q.answer      = ans
         q.answered_at = datetime.utcnow()
         db.session.commit()
-        return jsonify(
-          id          =q.id,
-          answer      =q.answer,
-          answered_at =q.answered_at.isoformat()
-        ), 200
-    
+        return jsonify(message="answered", answered_at=q.answered_at.isoformat()), 200
+        
      # -------------- (keep your existing routes) ----------------
-    from app.models import User, Category, Item, Auction, Bid, Alert
+    from app.models import User, Category, Item, Auction, Bid, Alert, Question
 
     @app.route("/users", methods=["GET"])
     def list_users():
@@ -1123,7 +1195,7 @@ def create_app():
         now = datetime.utcnow()
         if auction.status != "open" or now > auction.end_time:
             return jsonify(error="Auction closed"), 400
-
+        user_obj = User.query.filter_by(username=user).first_or_404()
         # find current highest amount (or init_price if no bids)
         highest = (
             db.session.query(db.func.max(Bid.amount))
@@ -1145,6 +1217,7 @@ def create_app():
             b = Bid(
                 auction_id=auction_id,
                 bidder=user,
+                bidder_id=user_obj.id,
                 amount=bid_amt,
                 max_bid=max_bid
             )
@@ -1153,6 +1226,7 @@ def create_app():
             return jsonify(
                 id=b.id,
                 bidder=b.bidder,
+                bidder_id=user_obj.id,
                 amount=b.amount,
                 max_bid=b.max_bid,
                 timestamp=b.timestamp.isoformat()
@@ -1169,6 +1243,7 @@ def create_app():
             b = Bid(
                 auction_id=auction_id,
                 bidder=user,
+                bidder_id=user_obj.id,
                 amount=amt,
                 max_bid=None
             )

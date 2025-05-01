@@ -129,8 +129,6 @@ class Bid(db.Model):
             'User', 
             backref='bids', 
             foreign_keys=[bidder_id])
-    
-    # relationship back to Auction so you can do auction.bids
 
     auction     = db.relationship(
         'Auction',
@@ -162,7 +160,6 @@ class Question(db.Model):
     answered_by_id  = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     answered_at     = db.Column(db.DateTime, nullable=True)
 
-    # relationships
     asker       = db.relationship('User', foreign_keys=[user_id], backref='questions')
     answered_by = db.relationship('User', foreign_keys=[answered_by_id])
     auction     = db.relationship('Auction', backref='questions')

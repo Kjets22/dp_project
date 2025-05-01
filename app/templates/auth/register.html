@@ -13,7 +13,6 @@
         <form method="post" action="{{ url_for('auth_register') }}"
               id="register-form" novalidate>
 
-          <!-- Username -->
           <div class="form-group">
             <label>Username</label>
             <input name="username" type="text" class="form-control"
@@ -29,28 +28,24 @@
             <div id="username-check-result" class="mt-2"></div>
           </div>
 
-          <!-- Password -->
           <div class="form-group">
             <label>Password</label>
             <input name="password" type="password"
                    class="form-control" required>
           </div>
 
-          <!-- Full Name -->
           <div class="form-group">
             <label>Full Name</label>
             <input name="full_name" type="text"
                    class="form-control" required>
           </div>
 
-          <!-- Date of Birth -->
           <div class="form-group">
             <label>Date of Birth</label>
             <input name="date_of_birth" type="date"
                    class="form-control" required>
           </div>
 
-          <!-- Email + Check -->
           <div class="form-group">
             <label for="email-input">Email</label>
             <input name="email" type="email"
@@ -66,7 +61,6 @@
             <div id="email-check-result" class="mt-2"></div>
           </div>
 
-          <!-- Submit -->
           <button type="submit" class="btn btn-primary mt-3"
                   id="submit-btn" disabled>
             Create Account

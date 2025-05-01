@@ -7,13 +7,9 @@
 
   {% if current_user.is_authenticated and current_user.id == user.id %}
     <hr>
-
-    <!-- Delete account -->
     <form action="{{ url_for('auth_delete') }}" method="get" class="d-inline-block mr-2">
       <button type="submit" class="btn btn-danger">Delete My Account</button>
     </form>
-
-    <!-- Manage Alerts -->
     <a href="{{ url_for('create_alert', id=current_user.id) }}"
         class="btn btn-outline-warning ml-2">
       <span class="mr-1">⏰</span>New Alert
@@ -22,8 +18,6 @@
 
   <p class="mt-3"><em>DOB: {{ user.date_of_birth.strftime('%B %-d, %Y') }}</em></p>
   <hr>
-
-  <!-- Items Created -->
   <h4>Your Items</h4>
   {% if created_items %}
     <ul class="list-group mb-4">
@@ -44,8 +38,6 @@
   {% endif %}
 
   <hr>
-
-  <!-- Auctions Created -->
   <h4>Your Auctions (Selling)</h4>
   {% if created_aucs %}
     <ul class="list-group mb-4">
@@ -66,8 +58,6 @@
   {% endif %}
 
   <hr>
-
-  <!-- Auctions Participated -->
   <h4>Auctions You Bid On</h4>
   {% if participated %}
     <ul class="list-group">

@@ -7,7 +7,6 @@
 
   {% if current_user.is_authenticated %}
     <form method="post">
-      <!-- Category dropdown + “New” button -->
       <div class="form-group">
         <label for="category_id">Category</label>
         <div class="input-group">
@@ -31,7 +30,6 @@
         </div>
       </div>
 
-      <!-- Title -->
       <div class="form-group">
         <label for="title">Title</label>
         <input
@@ -44,7 +42,6 @@
         >
       </div>
 
-      <!-- Description -->
       <div class="form-group">
         <label for="description">Description</label>
         <textarea

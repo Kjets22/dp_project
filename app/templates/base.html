@@ -9,24 +9,19 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
-  <!-- nav -->
   <div class="d-flex flex-column flex-md-row align-items-center 
               p-3 px-md-4 mb-3 bg-white border-bottom box-shadow">
     <h5 class="my-0 mr-md-auto font-weight-normal">BuyMe</h5>
     <nav class="my-2 my-md-0 mr-md-3">
 
-      <!-- always show Home -->
       <a class="btn btn-outline-primary" href="{{ url_for('home') }}">Home</a>
 
       {% if current_user.is_authenticated %}
-        <!-- My Page -->
         <a class="btn btn-outline-fix text-dark mr-2"
            href="{{ url_for('user_detail', id=current_user.id) }}">
           My Page
         </a>
 
-        <!-- Create, Browse -->
         <a class="btn btn-outline-fix text-dark" 
            href="{{ url_for('create_item_form') }}">
           Create
@@ -36,23 +31,19 @@
           Browse
         </a>
 
-        <!-- Alerts button -->
         <a class="btn btn-outline-fix text-dark ml-2" 
            href="{{ url_for('alert_detail', id=current_user.id) }}">
           Alerts
         </a>
 
-        <!-- Logout (POST) -->
         <form method="POST"
               action="{{ url_for('auth_logout') }}"
               style="display:inline;">
-          <!-- include CSRF token here if you’re using one -->
           <button type="submit" class="btn btn-outline-fix text-dark ml-2">
             Logout
           </button>
         </form>
       {% else %}
-        <!-- Login -->
         <a class="btn btn-outline-fix text-dark" 
            href="{{ url_for('auth_login') }}">
           Login

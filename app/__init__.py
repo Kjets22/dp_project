@@ -161,29 +161,27 @@ def create_app():
 
         def get_top_bid():
             return (Bid.query
-                    .filter_by(auction_id=auc_id)
-                    .order_by(Bid.amount.desc())
-                    .first())
+                        .filter_by(auction_id=auc_id)
+                        .order_by(Bid.amount.desc())
+                        .first())
 
-        # 0) Auto‐close if past end_time (use local now, not UTC)
+        # 0) Auto‐close if past end_time
         if auction.status == 'open' and datetime.now() >= auction.end_time:
             top = get_top_bid()
             if top and top.amount >= auction.reserve_price:
-                usr = User.query.filter_by(username=top.bidder).first()
-                auction.winner_id   = usr.id if usr else None
+                auction.winner_id   = top.bidder_id
                 auction.winning_bid = top.amount
             else:
                 auction.winning_bid = top.amount if top else None
             auction.status = 'closed'
             db.session.commit()
 
-        # 1) Fetch the (possibly new) top bid & update winning_id
+        # 1) Fetch current top bid
         top = get_top_bid()
         if top:
             current_price   = top.amount
             highest_bidder  = top.bidder
-            usr_curr        = User.query.filter_by(username=top.bidder).first()
-            auction.winning_id = usr_curr.id if usr_curr else None
+            auction.winning_id = top.bidder_id
         else:
             current_price   = auction.init_price
             highest_bidder  = None
@@ -196,11 +194,13 @@ def create_app():
                 flash("This auction has ended; no more bids allowed.", "warning")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
-            # ── Validation ─────────────────────────
+            # Seller can’t bid
             if current_user.id == auction.seller_id:
                 flash("You cannot bid on your own auction.", "danger")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
-            if highest_bidder == current_user.username:
+
+            # Already highest (including anonymous)
+            if highest_bidder in (current_user.username, f"anonymous{current_user.id}"):
                 flash("You’re already the highest bidder.", "warning")
                 return redirect(url_for("auction_detail", auc_id=auc_id))
 
@@ -208,7 +208,7 @@ def create_app():
             max_raw      = request.form.get("max_bid","").strip()
             amt_raw      = request.form.get("bid_amount","").strip()
 
-            # ── Build the user’s bid (with ceiling) ───────
+            # Build bid amount
             if max_raw:
                 try:
                     ceiling = float(max_raw)
@@ -230,9 +230,15 @@ def create_app():
                     return redirect(url_for("auction_detail", auc_id=auc_id))
                 ceiling = bid_amt
 
+            # Anonymous checkbox?
+            anonymous = bool(request.form.get("anonymous"))
+            bidder_str = f"anonymous{current_user.id}" if anonymous else current_user.username
+
+            # Create the bid
             user_bid = Bid(
-                auction_id=auc_id,
-                bidder     = current_user.username,
+                auction_id = auc_id,
+                bidder     = bidder_str,
+                bidder_id  = current_user.id,
                 amount     = bid_amt,
                 max_bid    = ceiling
             )
@@ -240,49 +246,58 @@ def create_app():
             db.session.commit()
             flash("Your bid was placed!", "success")
 
-            # 3) Collect each bidder’s top ceiling
+            # 3) Auto‐bidding among all ceilings
             proxies = {}
             for b in Bid.query.filter_by(auction_id=auc_id):
                 if b.max_bid is not None:
                     proxies[b.bidder] = max(proxies.get(b.bidder, 0), b.max_bid)
 
-            # 4) Auto-bid back-and-forth between the top two ceilings
             while len(proxies) >= 2:
                 top            = get_top_bid()
                 current_price  = top.amount
                 current_winner = top.bidder
 
-                (u1,m1),(u2,m2) = sorted(proxies.items(), key=lambda x: x[1], reverse=True)[:2]
-                if current_winner == u1:
-                    nxt, nxt_max = u2, m2
-                else:
-                    nxt, nxt_max = u1, m1
+                # find the top two proxy ceilings
+                (b1,c1),(b2,c2) = sorted(proxies.items(), key=lambda x: x[1], reverse=True)[:2]
+                nxt, nxt_max    = (b2, c2) if current_winner == b1 else (b1, c1)
 
                 nxt_price = current_price + auction.increment
                 if nxt_price > nxt_max:
                     break
 
+                # determine bidder_id for the next bidder (handles anonymousXXX)
+                if nxt.startswith("anonymous"):
+                    try:
+                        anon_id = int(nxt.replace("anonymous",""))
+                    except ValueError:
+                        anon_id = None
+                    auto_bidder_id = anon_id
+                else:
+                    real = User.query.filter_by(username=nxt).first()
+                    auto_bidder_id = real.id if real else None
+
+                # place auto‐bid
                 auto = Bid(
-                    auction_id=auc_id,
-                    bidder    = nxt,
-                    amount    = nxt_price,
-                    max_bid   = nxt_max
+                    auction_id = auc_id,
+                    bidder     = nxt,
+                    bidder_id  = auto_bidder_id,
+                    amount     = nxt_price,
+                    max_bid    = nxt_max
                 )
                 db.session.add(auto)
                 db.session.commit()
                 flash(f"Auto-bid: {nxt} → {nxt_price:.2f}", "info")
 
-                usr_next = User.query.filter_by(username=nxt).first()
-                auction.winning_id = usr_next.id if usr_next else None
+                auction.winning_id = auto.bidder_id
                 db.session.commit()
 
             return redirect(url_for("auction_detail", auc_id=auc_id))
 
-        # 5) GET → render the page
+        # 3) GET → render
         bids = (Bid.query
-                .filter_by(auction_id=auc_id)
-                .order_by(Bid.timestamp.desc())
-                .all())
+                    .filter_by(auction_id=auc_id)
+                    .order_by(Bid.timestamp.desc())
+                    .all())
 
         return render_template(
             "auctions/detail.html",
@@ -292,6 +307,7 @@ def create_app():
             current_price=  current_price,
             highest_bidder= highest_bidder
         )
+
 
     @app.route('/auctions', methods=['GET'])
     def list_auctions():
@@ -1637,6 +1653,7 @@ def create_app():
         # 3) All auctions (so you can remove illegal ones)
         auctions = Auction.query.order_by(Auction.start_time.desc()).all()
 
+        #TODO: make questions available
         # # 4) All user‐submitted questions (and replies)
         # #    You’ll need a Question (and maybe Answer) model for this.
         # from app.models import Question, Answer  # adjust if your models differ

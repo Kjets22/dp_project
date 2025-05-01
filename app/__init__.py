@@ -435,14 +435,35 @@ def create_app():
     @rep_required
     def answer_question(q_id):
         q = Question.query.get_or_404(q_id)
-        data = request.get_json(force=True)
-        ans = data.get('answer')
+
+        # First try to pull from form data (your HTML form)
+        ans = request.form.get('answer', '').strip()
+
+        # If not in form, try JSON payload
         if not ans:
-            return jsonify(error="answer required"), 400
-        q.answer      = ans
-        q.answered_at = datetime.utcnow()
+            data = request.get_json(silent=True) or {}
+            ans = (data.get('answer') or '').strip()
+
+        if not ans:
+            # If this was an API call, return JSON error
+            if request.is_json:
+                return jsonify(error="answer required"), 400
+            # Otherwise flash & redirect back to rep dashboard
+            flash("Please enter an answer before submitting.", "danger")
+            return redirect(url_for('rep_detail', id=current_user.id))
+
+        # Save the answer
+        q.answer_text     = ans
+        q.answered_by_id  = current_user.id
+        q.answered_at     = datetime.utcnow()
         db.session.commit()
-        return jsonify(message="answered", answered_at=q.answered_at.isoformat()), 200
+
+        # Respond appropriately
+        if request.is_json:
+            return jsonify(message="answered", answered_at=q.answered_at.isoformat()), 200
+
+        flash("Your reply has been posted.", "success")
+        return redirect(url_for('rep_detail', id=current_user.id))
         
     from app.models import User, Category, Item, Auction, Bid, Alert, Question
 
@@ -1229,26 +1250,24 @@ def create_app():
             User.is_admin == False
         ).all()
 
-        # 2) All bids (so you can remove illegal ones)
         bids = Bid.query.order_by(Bid.timestamp.desc()).all()
-
-        # 3) All auctions (so you can remove illegal ones)
         auctions = Auction.query.order_by(Auction.start_time.desc()).all()
 
-        #TODO: make questions available
-        # # 4) All user‐submitted questions (and replies)
-        # #    You’ll need a Question (and maybe Answer) model for this.
-        # from app.models import Question, Answer  # adjust if your models differ
-        # questions = Question.query.order_by(Question.created_at.desc()).all()
+        from app.models import Question
+        questions = (
+            Question.query
+                    .order_by(Question.created_at.desc())
+                    .all()
+        )
 
         return render_template(
             'rep/detail.html',
             users=users,
             bids=bids,
             auctions=auctions,
-            questions=None
-            # questions=questions
+            questions=questions
         )
+        
     @app.route('/rep/edit_user/<string:username>', methods=['GET','POST'])
     @rep_required
     def rep_edit_user(username):
@@ -1303,7 +1322,40 @@ def create_app():
         auc = Auction.query.get_or_404(auction_id)
         db.session.delete(auc)
         db.session.commit()
-        flash(f"Auction {auction_id} removed", "info")
         return redirect(url_for('rep_detail', id=current_user.id))
+    @app.route('/qna', methods=['GET','POST'])
+    @login_required
+    def qna():
+        auctions = (
+            Auction.query
+                   .join(Bid, Bid.auction_id == Auction.id)
+                   .filter(Bid.bidder_id == current_user.id)
+                   .distinct()
+                   .order_by(Auction.id.desc())
+                   .all()
+        )
 
+        if request.method == 'POST':
+            auction_id = request.form.get('auction_id', type=int)
+            text       = request.form.get('question', '').strip()
+            if not auction_id or not text:
+                flash('Please select an auction and enter a question.', 'danger')
+                return redirect(url_for('qna'))
+            Auction.query.get_or_404(auction_id)
+            q = Question(
+                auction_id   = auction_id,
+                user_id      = current_user.id,
+                question_text= text
+            )
+            db.session.add(q)
+            db.session.commit()
+            return redirect(url_for('qna'))
+
+        questions = (
+            Question.query
+                    .filter_by(user_id=current_user.id)
+                    .order_by(Question.created_at.desc())
+                    .all()
+        )
+        return render_template('qna.html', auctions=auctions, questions=questions)
     return app

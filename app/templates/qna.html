@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Q&A Center{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Q&amp;A Center</h2>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5>Ask a Question</h5>
+      <form method="post">
+        <div class="form-group">
+          <label for="auction-select">Which auction?</label>
+          <select id="auction-select" name="auction_id" class="form-control" required>
+            <option value="" disabled selected>Choose an auction…</option>
+            {% for a in auctions %}
+              <option value="{{ a.id }}">
+                #{{ a.id }} – “{{ a.item.title }}” (ends {{ a.end_time.strftime('%b %-d, %Y') }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="question-text">Your Question</label>
+          <textarea id="question-text" name="question" class="form-control" rows="3" required></textarea>
+        </div>
+        <button class="btn btn-primary">Submit Question</button>
+      </form>
+    </div>
+  </div>
+
+  <h4>Your Questions</h4>
+  {% if questions %}
+    <ul class="list-group">
+      {% for q in questions %}
+        <li class="list-group-item">
+          <p>
+            <strong>#{{ q.id }}</strong> on Auction #{{ q.auction_id }}
+            <span class="text-muted">asked {{ q.created_at.strftime('%b %-d, %Y %H:%M') }}</span>
+          </p>
+          <p>{{ q.question_text }}</p>
+          {% if q.answer_text %}
+            <div class="border p-3 bg-light">
+              <p><strong>Answer:</strong></p>
+              <p>{{ q.answer_text }}</p>
+            </div>
+          {% else %}
+            <p class="text-muted">No answer yet.</p>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-muted">You haven’t asked any questions yet.</p>
+  {% endif %}
+
+  <a href="{{ url_for('user_detail', id=current_user.id) }}" class="btn btn-outline-secondary mt-4">
+    ← Back to Profile
+  </a>
+</div>
+{% endblock %}

@@ -1,4 +1,6 @@
-## CS527 Term Project
+## CS527 Term Project-Group 17
+Team Member:
+Krish, Seunggyu, Anirudh
 1. Execute the application code.
 ```
 python run.py

@@ -1159,44 +1159,67 @@ def create_app():
     @app.route('/admin/<int:id>', methods=['GET'])
     @admin_required
     def admin_detail(id):
+        # only allow each admin to see their own dashboard
         if current_user.id != id:
             return jsonify(error="Forbidden"), 403
 
+        # Define a base filter for “successful” auctions
+        success_filter = (
+            Auction.status == 'closed',
+            Auction.winning_bid != None,
+            Auction.winning_bid >= Auction.reserve_price
+        )
+
+        # total earnings of all successful auctions
         total = (
-            db.session.query(func.coalesce(func.sum(Auction.winning_bid), 0.0))
-                .filter(Auction.status=='closed')
-                .scalar()
+            db.session
+              .query(func.coalesce(func.sum(Auction.winning_bid), 0.0))
+              .filter(*success_filter)
+              .scalar()
         )
 
+        # earnings per item, descending
         per_item = (
-            db.session.query(Item.title,
-                            func.coalesce(func.sum(Auction.winning_bid), 0.0).label('earnings'))
-            .join(Auction, Auction.item_id==Item.id)
-            .filter(Auction.status=='closed')
-            .group_by(Item.id)
-            .order_by(func.sum(Auction.winning_bid).desc())
-            .all()
+            db.session
+              .query(
+                  Item.title,
+                  func.coalesce(func.sum(Auction.winning_bid), 0.0).label('earnings')
+              )
+              .join(Auction, Auction.item_id == Item.id)
+              .filter(*success_filter)
+              .group_by(Item.id)
+              .order_by(func.sum(Auction.winning_bid).desc())
+              .all()
         )
 
+        # earnings per category
         per_category = (
-            db.session.query(Category.name,
-                            func.coalesce(func.sum(Auction.winning_bid), 0.0))
-            .join(Item, Item.category_id==Category.id)
-            .join(Auction, Auction.item_id==Item.id)
-            .filter(Auction.status=='closed')
-            .group_by(Category.id)
-            .all()
+            db.session
+              .query(
+                  Category.name,
+                  func.coalesce(func.sum(Auction.winning_bid), 0.0).label('earnings')
+              )
+              .join(Item, Item.category_id == Category.id)
+              .join(Auction, Auction.item_id == Item.id)
+              .filter(*success_filter)
+              .group_by(Category.id)
+              .all()
         )
 
+        # earnings per end‐user
         per_user = (
-            db.session.query(User.username,
-                            func.coalesce(func.sum(Auction.winning_bid), 0.0))
-            .join(Auction, Auction.winner_id==User.id)
-            .filter(Auction.status=='closed')
-            .group_by(User.id)
-            .all()
+            db.session
+              .query(
+                  User.username,
+                  func.coalesce(func.sum(Auction.winning_bid), 0.0).label('earnings')
+              )
+              .join(Auction, Auction.winner_id == User.id)
+              .filter(*success_filter)
+              .group_by(User.id)
+              .all()
         )
 
+        # top 5 best‐selling items & best buyers
         best_items  = per_item[:5]
         best_buyers = per_user[:5]
 

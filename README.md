@@ -3,12 +3,10 @@
 Team Member:
 Krish, Seunggyu, Anirudh
 ---
-## Tech Stacks
- ![alt text](/images/smtp.png)
- ![alt text](/images/html.png)
- ![alt text](/images/sqlalchemy.png)
- ![alt text](/images/flask.png)
----
+<img src="/images/smtp.png" alt="SMTP" width="64" height="64" />
+<img src="/images/html.png" alt="HTML"  width="64" height="64" />
+<img src="/images/sqlalchemy.png" alt="SQLAlchemy" width="64" height="64" />
+<img src="/images/flask.png" alt="Flask" width="64" height="64" />
 1. Execute the application code.
 ```
 python run.py

@@ -1159,18 +1159,15 @@ def create_app():
     @app.route('/admin/<int:id>', methods=['GET'])
     @admin_required
     def admin_detail(id):
-        # only allow each admin to see their own dashboard
         if current_user.id != id:
             return jsonify(error="Forbidden"), 403
 
-        # Define a base filter for “successful” auctions
         success_filter = (
             Auction.status == 'closed',
             Auction.winning_bid != None,
             Auction.winning_bid >= Auction.reserve_price
         )
 
-        # total earnings of all successful auctions
         total = (
             db.session
               .query(func.coalesce(func.sum(Auction.winning_bid), 0.0))
@@ -1178,7 +1175,6 @@ def create_app():
               .scalar()
         )
 
-        # earnings per item, descending
         per_item = (
             db.session
               .query(
@@ -1192,7 +1188,6 @@ def create_app():
               .all()
         )
 
-        # earnings per category
         per_category = (
             db.session
               .query(
@@ -1206,7 +1201,6 @@ def create_app():
               .all()
         )
 
-        # earnings per end‐user
         per_user = (
             db.session
               .query(
@@ -1219,7 +1213,6 @@ def create_app():
               .all()
         )
 
-        # top 5 best‐selling items & best buyers
         best_items  = per_item[:5]
         best_buyers = per_user[:5]
 

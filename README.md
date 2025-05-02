@@ -3,10 +3,12 @@
 Team Member:
 Krish, Seunggyu, Anirudh
 ---
-<img src="/images/smtp.png" alt="SMTP" width="64" height="64" />
-<img src="/images/html.png" alt="HTML"  width="64" height="64" />
-<img src="/images/sqlalchemy.png" alt="SQLAlchemy" width="64" height="64" />
-<img src="/images/flask.png" alt="Flask" width="64" height="64" />
+<p align="center">
+  <img src="/images/smtp.png" alt="SMTP" width="120" />
+  <img src="/images/html.png" alt="HTML"  width="120" />
+  <img src="/images/sqlalchemy.png" alt="SQLAlchemy" width="120" />
+  <img src="/images/flask.png" alt="Flask" width="120" />
+</p>
 1. Execute the application code.
 ```
 python run.py

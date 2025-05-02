@@ -1,6 +1,14 @@
 ## CS527 Term Project-Group 16
+---
 Team Member:
 Krish, Seunggyu, Anirudh
+---
+## Tech Stacks
+ ![alt text](/images/smtp.png)
+ ![alt text](/images/html.png)
+ ![alt text](/images/sqlalchemy.png)
+ ![alt text](/images/flask.png)
+---
 1. Execute the application code.
 ```
 python run.py

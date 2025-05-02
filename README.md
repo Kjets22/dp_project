@@ -1,4 +1,4 @@
-## CS527 Term Project-Group 17
+## CS527 Term Project-Group 16
 Team Member:
 Krish, Seunggyu, Anirudh
 1. Execute the application code.

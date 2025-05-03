@@ -1,75 +1,14 @@
 ## CS527 Term Project-Group 16
 ---
-## Team Member:
+Team Member:
 Krish, Seunggyu, Anirudh
 ---
-## Teck Stacks
-<div style="display:flex; justify-content:center; align-items:flex-start; gap:1.5rem;">
-  <figure style="margin:0; text-align:center;">
-    <img src="/images/smtp.png" alt="SMTP" width="120" />
-    <figcaption>SMTP<br/>Server</figcaption>
-  </figure>
-  <figure style="margin:0; text-align:center;">
-    <img src="/images/html.png" alt="HTML" width="120" />
-    <figcaption>HTML5</figcaption>
-  </figure>
-  <figure style="margin:0; text-align:center;">
-    <img src="/images/sqlalchemy.png" alt="SQLAlchemy" width="120" />
-    <figcaption>SQLAlchemy<br/>ORM</figcaption>
-  </figure>
-  <figure style="margin:0; text-align:center;">
-    <img src="/images/flask.png" alt="Flask" width="120" />
-    <figcaption>Flask<br/>Framework</figcaption>
-  </figure>
-</div>
-
----
-## ER-Diagram
-![alt text](/images/diagram.png)
----
-## Core Features
 <p align="center">
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/user.png" alt="user" width="120" />
-  <figcaption>
-    User<br/>
-    Admin<br/>
-    Customer_Representative
-  </figcaption>
-  </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/item.png" alt="item" width="120" />
-    <figcaption>Item</figcaption>
-  </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/auction.png" alt="auction" width="120" />
-    <figcaption>Auction</figcaption>
-  </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/bidding.png" alt="bidding" width="120" />
-    <figcaption>Bidding(w/ AutoBidding)</figcaption>
-  </figure>
+  <img src="/images/smtp.png" alt="SMTP" width="120" />
+  <img src="/images/html.png" alt="HTML"  width="120" />
+  <img src="/images/sqlalchemy.png" alt="SQLAlchemy" width="120" />
+  <img src="/images/flask.png" alt="Flask" width="120" />
 </p>
-<p align="center">
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/qna.png" alt="qna" width="120" />
-  <figcaption>Q&A</figcaption>
-  </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/alert.png" alt="alert" width="120" />
-    <figcaption>Alert</figcaption>
-  </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/browse.png" alt="browse" width="120" />
-    <figcaption>Browse</figcaption>
-  </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
-    <img src="/images/sales_report.png" alt="sales_report" width="120" />
-    <figcaption>Sales Report</figcaption>
-  </figure>
-</p>
-
----
 1. Execute the application code.
 ```
 python run.py

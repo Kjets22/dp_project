@@ -22,6 +22,25 @@ Krish(kj432), Seunggyu(sl2486), Anirudh(lb1115)
   </figure>
 </p>
 
+## Execution
+1. Execute the application code.
+```
+python run.py
+```
+2. Turn on the local aiosmtpd server for email alerts
+```
+python -m aiosmtpd -n -l localhost:1025
+```
+3. Add an admin to the database. 
+```
+curl -X POST http://localhost:5000/admin/register \
+     -H "Content-Type: application/json" \
+     -d '{
+           "username": "admin",
+           "password": "1q2w3e4r",
+           "email":    "admin@example.com"
+         }'
+```
 
 ## ER-Diagram
 ![alt text](/images/diagram.png)
@@ -77,26 +96,6 @@ Krish(kj432), Seunggyu(sl2486), Anirudh(lb1115)
 #### &emsp;&emsp;9-1. Manage Customer Representative
 ![alt text](/images/admin_rep.png)
 #### &emsp;&emsp;9-2. Create Customer Representative
-![alt text](/images/admin_rep.png)
+![alt text](/images/admin_rep_create.png)
 #### &emsp;&emsp;9-3. Manage Sales Report
 ![alt text](/images/admin_sales_report.png)
-
-## Execution
-1. Execute the application code.
-```
-python run.py
-```
-2. Turn on the local aiosmtpd server for email alerts
-```
-python -m aiosmtpd -n -l localhost:1025
-```
-3. Add an admin to the database. 
-```
-curl -X POST http://localhost:5000/admin/register \
-     -H "Content-Type: application/json" \
-     -d '{
-           "username": "admin",
-           "password": "1q2w3e4r",
-           "email":    "admin@example.com"
-         }'
-```

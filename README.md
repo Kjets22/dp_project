@@ -4,24 +4,24 @@
 Krish, Seunggyu, Anirudh
 ---
 ## Teck Stacks
-<p align="center">
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
+<div style="display:flex; justify-content:center; align-items:flex-start; gap:1.5rem;">
+  <figure style="margin:0; text-align:center;">
     <img src="/images/smtp.png" alt="SMTP" width="120" />
-    <figcaption>SMTP Server</figcaption>
+    <figcaption>SMTP<br/>Server</figcaption>
   </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
+  <figure style="margin:0; text-align:center;">
     <img src="/images/html.png" alt="HTML" width="120" />
     <figcaption>HTML5</figcaption>
   </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
+  <figure style="margin:0; text-align:center;">
     <img src="/images/sqlalchemy.png" alt="SQLAlchemy" width="120" />
-    <figcaption>SQLAlchemy ORM</figcaption>
+    <figcaption>SQLAlchemy<br/>ORM</figcaption>
   </figure>
-  <figure style="display:inline-block; text-align:center; margin:0 20px">
+  <figure style="margin:0; text-align:center;">
     <img src="/images/flask.png" alt="Flask" width="120" />
-    <figcaption>Flask Framework</figcaption>
+    <figcaption>Flask<br/>Framework</figcaption>
   </figure>
-</p>
+</div>
 
 ---
 ## ER-Diagram

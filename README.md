@@ -77,7 +77,7 @@ Krish(kj432), Seunggyu(sl2486), Anirudh(lb1115)
 #### &emsp;&emsp;9-1. Manage Customer Representative
 ![alt text](/images/admin_rep.png)
 #### &emsp;&emsp;9-2. Create Customer Representative
-![alt text](/images/admin_rep.png)
+![alt text](/images/admin_rep_create.png)
 #### &emsp;&emsp;9-3. Manage Sales Report
 ![alt text](/images/admin_sales_report.png)
 

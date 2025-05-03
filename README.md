@@ -53,7 +53,7 @@ curl -X POST http://localhost:5000/admin/register \
 ![alt text](/images/user_login.png)
 #### &emsp;&emsp;1-3: User MyPage(History of Q&A, Auctions, Items, Bidding)
 ![alt text](/images/user_detail.png)
-#### &emsp;&emsp;1-3: Make Q&A
+#### &emsp;&emsp;1-4: Make Q&A
 ![alt text](/images/user_qna.png)
 ### 2. Item
 #### &emsp;&emsp;2-1. Create Item
